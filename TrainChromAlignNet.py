@@ -1,16 +1,15 @@
 import pandas as pd
-import os
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
 import sys
+import os
 import tensorflow as tf
-from tensorflow.keras.models import Model, Sequential, load_model
-from tensorflow.keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D
-from tensorflow.keras.layers import LSTM, Bidirectional
+from tensorflow.keras.models import load_model
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
-import tensorflow.keras.backend as K
+from utils import loadData, printShapes
+from model_definition import define_model
 
 
 #%% Options
@@ -43,7 +42,6 @@ modelName = modelName + '-' + datasetSelection + '-01' + '-r' + str(repetition).
 
 print("Output model to: ", modelName)
 
-
 if trainWithGPU:
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -71,72 +69,6 @@ dataPaths = list( dataSets[i] for i in datasetForModel[datasetSelection] )
 
 infoFile = 'PeakData-WithGroup.csv'
 sequenceFile = 'WholeSequence.csv'
-
-
-def loadData(dataPath):
-    infoDf = pd.read_csv(os.path.join(dataPath, infoFile), index_col = 0)
-    sequenceDf = pd.read_csv(os.path.join(dataPath, sequenceFile), index_col = 0)
-    
-    ### Load peak and mass slice profiles
-    peakFiles = []
-    massProfileFiles = []
-    for f in os.listdir(dataPath):
-        if f.endswith('.txt'):
-            peakFiles.append(f)
-            
-        if f.endswith('.tsv'):
-            massProfileFiles.append(f)
-    
-    peakFiles.sort()
-    dfs = []
-    for i, file in enumerate(peakFiles):
-        df = pd.read_csv(os.path.join(dataPath,file), header = None)
-        dfs.append(df)
-    peakDf = pd.concat(dfs, axis = 1)
-    
-    massProfileFiles.sort()
-    dfs = []
-    for i, file in enumerate(massProfileFiles):
-        df = pd.read_csv(os.path.join(dataPath,file), header = None)
-        dfs.append(df)
-    massProfileDf = pd.concat(dfs, axis = 1)
-    
-    del dfs
-    del df
-    
-    ### Pre-process Data - Normalise peak height and remove abnormal somples
-    peakDf = peakDf - np.min(peakDf)
-    peakDf.fillna(0, inplace = True)
-    
-    peakDdfMax = peakDf.max(axis=0)
-    peakDf = peakDf.divide(peakDdfMax, axis=1)
-    peakDf = peakDf.transpose()
-    peakDf.reset_index(inplace = True, drop = True)
-    
-    
-    massProfileDf = massProfileDf - np.min(massProfileDf)
-    massProfileDf.fillna(0, inplace = True)
-    
-    massProfileDfMax = massProfileDf.max(axis=0)
-    massProfileDf = massProfileDf.divide(massProfileDfMax, axis=1)
-    massProfileDf = massProfileDf.transpose()
-    massProfileDf.reset_index(inplace = True, drop = True)
-    
-    
-    idx = sequenceDf > 0
-    sequenceDf[idx] = np.log2(sequenceDf[idx])
-    sequenceDf = sequenceDf.transpose()
-    
-    
-    keepIndex = (pd.notnull(peakDf).all(1)) & (pd.notnull(massProfileDf).all(1)) & (infoDf['Group'] >= 0)
-    infoDf = infoDf[keepIndex]
-    peakDf = peakDf[keepIndex]
-    massProfileDf = massProfileDf[keepIndex]
-    
-    
-    print("Dropped rows: {}".format(np.sum(keepIndex == False)))
-    
-    return infoDf, peakDf, massProfileDf, sequenceDf
 
 
 #%% Generate data combinations
@@ -205,7 +137,15 @@ def generateCombinations(infoDf, peakDf, massProfileDf, sequenceDf):
 ### Execute load for all folders
 for dataPath in dataPaths:
     print('Loading:', dataPath)
-    infoDf, peakDf, massProfileDf, sequenceDf = loadData(dataPath)
+    infoDf, peakDf, massProfileDf, sequenceDf, _, _ = loadData(dataPath, infoFile, sequenceFile)
+
+    # Remove null rows and negative indexed groups
+    keepIndex = (pd.notnull(peakDf).all(1)) & (pd.notnull(massProfileDf).all(1)) & (infoDf['Group'] >= 0)
+    infoDf = infoDf[keepIndex]
+    peakDf = peakDf[keepIndex]
+    massProfileDf = massProfileDf[keepIndex]
+    print("Dropped rows: {}".format(np.sum(keepIndex == False)))
+
     a = len(comparisons)
     generateCombinations(infoDf, peakDf, massProfileDf, sequenceDf)
     print(len(comparisons) - a, 'combinations generated')
@@ -267,146 +207,6 @@ print('Sequence length:', sequence_length)
 print('Max mass sequence length:', max_mass_seq_length)
 
 
-def printShapes():
-    print('trainingTime1:', trainingTime1.shape)
-    print('trainingTime2:', trainingTime2.shape)
-    print('trainingPeakProfile1:', trainingPeakProfile1.shape)
-    print('trainingPeakProfile2:', trainingPeakProfile2.shape)
-    print('trainingMassProfile1:', trainingMassProfile1.shape)
-    print('trainingMassProfile2:', trainingMassProfile2.shape)
-    print('trainingSequenceProfile1:', trainingSequenceProfile1.shape)
-    print('trainingSequenceProfile2:', trainingSequenceProfile2.shape)
-    print('trainingY:', trainingY.shape)
-    print('---')
-    print('testingTime1:', testingTime1.shape)
-    print('testingTime2:', testingTime2.shape)
-    print('testingPeakProfile1:', testingPeakProfile1.shape)
-    print('testingPeakProfile2:', testingPeakProfile2.shape)
-    print('testingMassProfile1:', testingMassProfile1.shape)
-    print('testingMassProfile2:', testingMassProfile2.shape)
-    print('testingSequenceProfile1:', testingSequenceProfile1.shape)
-    print('testingSequenceProfile2:', testingSequenceProfile2.shape)
-    print('testingY:', testingY.shape)
-    print('testingComparisions:', testingComparisions.shape)
-
-
-def define_model():
-    ### Mass profile model
-    mass_input_shape = (max_mass_seq_length,)
-    mass_left_input = Input(mass_input_shape)
-    mass_right_input = Input(mass_input_shape)
-    
-    mass_encoder = Sequential()
-    mass_encoder.add(Dense(64, input_shape = mass_input_shape, activation = 'relu'))
-    mass_encoder.add(Dropout(0.2))
-    mass_encoder.add(Dense(64, activation = 'relu'))
-    mass_encoder.add(Dropout(0.2))
-    mass_encoder.add(Dense(10, activation = 'relu'))
-    
-    mass_encoded_l = mass_encoder(mass_left_input)
-    mass_encoded_r = mass_encoder(mass_right_input)
-    
-    
-    # Merge and compute L1 distance
-    mass_both = Subtract()([mass_encoded_l, mass_encoded_r])
-    mass_both = Lambda(lambda x: K.abs(x))(mass_both)
-    mass_prediction = Dense(1, activation='sigmoid', name = 'mass_prediction')(mass_both)
-    
-    
-    ### Peak profile model
-    peak_input_shape = (None, 1)  # Variable sequence length
-    P_in = Input(peak_input_shape)
-    peak_left_input = Input(peak_input_shape)
-    peak_right_input = Input(peak_input_shape)
-    
-    
-    P = Bidirectional(LSTM(64, return_sequences = True))(P_in)
-    P = Dropout(0.2)(P)
-    P = Bidirectional(LSTM(64, return_sequences = True))(P)
-    P = Dropout(0.2)(P)
-    _, state_h, state_c = LSTM(10, return_sequences = False, return_state = True)(P)
-    peak_output = Concatenate(axis = -1)([state_h, state_c])
-    peak_output = Dropout(0.2)(peak_output)
-    peak_output = Dense(10)(peak_output)
-    
-    peak_encoder = Model(inputs = P_in, outputs = peak_output)
-    
-    peak_encoded_l = peak_encoder(peak_left_input)
-    peak_encoded_r = peak_encoder(peak_right_input)
-    
-    
-    peak_both = Subtract()([peak_encoded_l, peak_encoded_r])
-    peak_both = Lambda(lambda x: K.abs(x))(peak_both)
-    peak_prediction = Dense(1, activation='sigmoid', name = 'peak_prediction')(peak_both)
-    
-    
-    ### Surrounding profile model
-    surround_input_shape = (sequence_length, 1)  # One channel
-    S_in = Input(surround_input_shape)
-    surround_left_input = Input(surround_input_shape)
-    surround_right_input = Input(surround_input_shape)
-    
-    # sequence_length of 600
-    F1 = Conv1D(filters = 3, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(S_in)
-    F1 = Conv1D(filters = 3, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(3)(F1)
-    # sequence_length of 200
-    F1 = Conv1D(filters = 6, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = Conv1D(filters = 6, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(2)(F1)
-    # sequence_length of 100
-    F1 = Conv1D(filters = 12, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = Conv1D(filters = 12, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(2)(F1)
-    # sequence_length of 50
-    F1 = Conv1D(filters = 24, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = Conv1D(filters = 24, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(2)(F1)
-    # sequence_length of 25
-    
-    F2 = Conv1D(filters = 3, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(S_in)
-    F2 = MaxPooling1D(3)(F2)  # Sequence length of 200
-    F2 = Conv1D(filters = 6, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F2)
-    F2 = MaxPooling1D(2)(F2)  # Sequence length of 100
-    F2 = Conv1D(filters = 12, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F2)
-    F2 = MaxPooling1D(2)(F2)  # Sequence length of 50
-
-    
-    F1 = Flatten()(F1)
-    F2 = Flatten()(F2)
-    surround_output = Concatenate(axis = -1)([F1, F2])
-    surround_output = Dropout(0.2)(surround_output)
-    surround_output = Dense(10)(surround_output)
-    
-    surround_encoder = Model(inputs = S_in, outputs = surround_output)
-    
-    surround_encoded_l = surround_encoder(surround_left_input)
-    surround_encoded_r = surround_encoder(surround_right_input)
-    
-    surround_both = Subtract()([surround_encoded_l, surround_encoded_r])
-    surround_both = Lambda(lambda x: K.abs(x))(surround_both)
-    surround_prediction = Dense(1, activation='sigmoid', name = 'surround_prediction')(surround_both)    
-    
-    ### Time model
-    
-    time_diff = Input((1,))
-    
-    
-    ### Combined model
-    combined_outputs = Lambda(lambda x: K.concatenate(x, axis = -1))([mass_both, peak_both, surround_both, time_diff])
-    
-    combined_outputs = Dropout(0.2)(combined_outputs)  # The time data may be dropped directly
-    combined_model = Dense(64, activation = 'relu')(combined_outputs)
-    combined_prediction = Dense(1, activation = 'sigmoid', name = 'main_prediction')(combined_model)
-    
-    
-    ### Build and compile
-    
-    siamese_net = Model(inputs = [mass_left_input, mass_right_input, peak_left_input, peak_right_input,
-                                  surround_left_input, surround_right_input, time_diff],
-                        outputs = [combined_prediction, mass_prediction, peak_prediction, surround_prediction])
-    
-    return siamese_net
 
 
 # Check if existing checkpoints are present - if so then load and resume training from last epoch
@@ -420,7 +220,7 @@ if os.path.isdir(checkpointPath):
     model = load_model(last_checkpoint)
     initial_epoch = int(last_checkpoint[-6:-3])
 else:
-    model = define_model()
+    model = define_model(max_mass_seq_length, sequence_length)
     initial_epoch = 1
 
 
@@ -429,7 +229,7 @@ model.compile(optimizer = Adam(**adamOptimizerOptions),
               metrics = ['accuracy'],
               loss_weights = [1., 0.2, 0.2, 0.2])
 
-#%% Fit model
+#%% Train model
 if os.path.isdir(modelPath) == False:
     os.makedirs(modelPath)
 
@@ -462,7 +262,6 @@ model.save(os.path.join(modelPath, modelName) + '.h5')
 if saveHistory:
     histDf = pd.DataFrame(history.history)
     histDf.to_csv(os.path.join(modelPath, modelName) + '-History.csv')
-
 
 
 ### Predict on test set
