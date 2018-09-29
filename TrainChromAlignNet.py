@@ -1,14 +1,13 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import itertools
 import sys
 import os
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
-from utils import loadData, printShapes
+from utils import loadData, printShapes, getChromatographSegmentDf, generateCombinationIndices
 from model_definition import define_model
 
 
@@ -23,6 +22,7 @@ saveCheckpoints = True  # If checkpoints exist, training will resume from the la
 saveHistory = True
 modelPath = 'SavedModels'
 modelName = 'ChromAlignNet'
+
 
 # Modify the model name for different data sources and repetitions
 if len(sys.argv) > 1:
@@ -71,8 +71,7 @@ infoFile = 'PeakData-WithGroup.csv'
 sequenceFile = 'WholeSequence.csv'
 
 
-#%% Generate data combinations
-
+### Execute load for all folders
 dataTime1 = []
 dataTime2 = []
 dataPeakProfile1 = []
@@ -82,59 +81,8 @@ dataMassProfile2 = []
 sequenceProfile1 = []
 sequenceProfile2 = []
 dataY = []
-comparisons = []
 
 
-def generateCombinations(infoDf, peakDf, massProfileDf, sequenceDf):
-    groups = sorted(infoDf.Group.unique())
-    
-    def appendSequenceProfile(time, file, margin = 300):
-        seq = np.zeros((margin * 2))
-        timeIdx = np.argmin(np.abs(time - sequenceDf.columns.values))
-        if margin > timeIdx:
-            seq[margin - timeIdx:] = sequenceDf.loc[str(file)].iloc[:timeIdx + margin].copy()
-        else:
-            insert = sequenceDf.loc[str(file)].iloc[timeIdx - margin: timeIdx + margin].copy()
-            seq[:len(insert)] = insert
-        
-        idx = seq > 0
-        seq[idx] = seq[idx] - np.min(seq[idx])
-        
-        return seq
-        
-    def appendData(x1, x2):
-        time1 = infoDf.loc[x1]['peakMaxTime']
-        time2 = infoDf.loc[x2]['peakMaxTime']
-        dataTime1.append(time1)
-        dataTime2.append(time2)
-        dataPeakProfile1.append(peakDf.loc[x1])
-        dataPeakProfile2.append(peakDf.loc[x2])
-        dataMassProfile1.append(massProfileDf.loc[x1])
-        dataMassProfile2.append(massProfileDf.loc[x2])
-        sequenceProfile1.append(appendSequenceProfile(time1, int(infoDf.loc[x1]['File'])))
-        sequenceProfile2.append(appendSequenceProfile(time2, int(infoDf.loc[x2]['File'])))
-        comparisons.append((x1, x2))
-    
-    for group in groups:
-        groupIndex = infoDf[infoDf['Group'] == group].index
-        combinations = itertools.combinations(groupIndex, 2)
-        count = 0
-        for x1, x2 in combinations:
-            appendData(x1, x2)
-            dataY.append(1)
-            count += 1
-        
-        largerGroups = infoDf[infoDf['Group'] > group].index 
-        combinations = itertools.product(groupIndex, largerGroups)
-        combinations = np.array(list(combinations))
-        np.random.shuffle(combinations)
-        
-        for i, (x1, x2) in enumerate(combinations):
-            if i > count: break
-            appendData(x1, x2)
-            dataY.append(0)
-
-### Execute load for all folders
 for dataPath in dataPaths:
     print('Loading:', dataPath)
     infoDf, peakDf, massProfileDf, sequenceDf, _, _ = loadData(dataPath, infoFile, sequenceFile)
@@ -144,29 +92,37 @@ for dataPath in dataPaths:
     infoDf = infoDf[keepIndex]
     peakDf = peakDf[keepIndex]
     massProfileDf = massProfileDf[keepIndex]
+    surroundsDf = getChromatographSegmentDf(infoDf, sequenceDf, sequence_length = 600)
     print("Dropped rows: {}".format(np.sum(keepIndex == False)))
 
-    a = len(comparisons)
-    generateCombinations(infoDf, peakDf, massProfileDf, sequenceDf)
-    print(len(comparisons) - a, 'combinations generated')
+    a = len(dataY)
+    x1, x2, y = generateCombinationIndices(infoDf, timeCutOff = None, returnY = True, shuffle = False, setRandomSeed = 100)
+    dataTime1.extend(infoDf.loc[x1]['peakMaxTime'])
+    dataTime2.extend(infoDf.loc[x2]['peakMaxTime'])
+    dataPeakProfile1.append(peakDf.loc[x1])
+    dataPeakProfile2.append(peakDf.loc[x2])
+    dataMassProfile1.append(massProfileDf.loc[x1])
+    dataMassProfile2.append(massProfileDf.loc[x2])
+    sequenceProfile1.append(surroundsDf.loc[x1])
+    sequenceProfile2.append(surroundsDf.loc[x2])
+    dataY.extend(y)
+    print(len(dataY) - a, 'combinations generated')
     
 ### Shuffle data
-np.random.seed(100)  # Set seed for repeatability in hyperparameter tests and continued training
 shuffleIndex = np.random.permutation(len(dataTime1))
 dataTime1 = np.array(dataTime1)[shuffleIndex]
 dataTime2 = np.array(dataTime2)[shuffleIndex]
-dataPeakProfile1 = pd.concat(dataPeakProfile1, axis = 1)  # Use pd to concat since the DataSeries might be of different lengths
+dataPeakProfile1 = pd.concat(dataPeakProfile1, axis = 0)  # Use pd to concat since the DataSeries might be of different lengths
 dataPeakProfile1.fillna(0, inplace = True)
-dataPeakProfile1 = dataPeakProfile1.transpose().values[shuffleIndex]
-dataPeakProfile2 = pd.concat(dataPeakProfile2, axis = 1)
+dataPeakProfile1 = dataPeakProfile1.values[shuffleIndex]
+dataPeakProfile2 = pd.concat(dataPeakProfile2, axis = 0)
 dataPeakProfile2.fillna(0, inplace = True)
-dataPeakProfile2 = dataPeakProfile2.transpose().values[shuffleIndex]
-dataMassProfile1 = np.array(dataMassProfile1)[shuffleIndex]
-dataMassProfile2 = np.array(dataMassProfile2)[shuffleIndex]
-sequenceProfile1 = np.array(sequenceProfile1)[shuffleIndex]
-sequenceProfile2 = np.array(sequenceProfile2)[shuffleIndex]
+dataPeakProfile2 = dataPeakProfile2.values[shuffleIndex]
+dataMassProfile1 = np.array(pd.concat(dataMassProfile1))[shuffleIndex]
+dataMassProfile2 = np.array(pd.concat(dataMassProfile2))[shuffleIndex]
+sequenceProfile1 = np.array(pd.concat(sequenceProfile1))[shuffleIndex]
+sequenceProfile2 = np.array(pd.concat(sequenceProfile2))[shuffleIndex]
 dataY = np.array(dataY)[shuffleIndex]
-comparisons = np.array(comparisons)[shuffleIndex]
 
 
 ### Split into training and test sets
@@ -191,7 +147,6 @@ testingMassProfile2 = dataMassProfile2[training:]
 testingSequenceProfile1 = sequenceProfile1[training:]
 testingSequenceProfile2 = sequenceProfile2[training:]
 testingY = dataY[training:]
-testingComparisions = comparisons[training:]
 
 
 samples, max_peak_seq_length = dataPeakProfile1.shape
@@ -208,10 +163,9 @@ print('Max mass sequence length:', max_mass_seq_length)
 
 
 
-
 # Check if existing checkpoints are present - if so then load and resume training from last epoch
 checkpointPath = os.path.join(modelPath, modelName + '-Checkpoint')
-if os.path.isdir(checkpointPath):
+if os.path.isdir(checkpointPath) and os.listdir(checkpointPath):
     files = []
     for f in os.listdir(checkpointPath):
         if f.endswith('.h5'):
@@ -221,7 +175,7 @@ if os.path.isdir(checkpointPath):
     initial_epoch = int(last_checkpoint[-6:-3])
 else:
     model = define_model(max_mass_seq_length, sequence_length)
-    initial_epoch = 1
+    initial_epoch = 0
 
 
 model.compile(optimizer = Adam(**adamOptimizerOptions),

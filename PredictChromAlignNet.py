@@ -4,10 +4,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import time
 import numpy as np
-import itertools
 import tensorflow.keras.backend as K
 from tensorflow.keras.models import load_model
-from utils import loadData
+from utils import loadData, getChromatographSegmentDf, generateCombinationIndices
 
 
 ## Changed the normalisation behaviour to fit the training file 2018-04-30-TrainClassifierSiamese-MultiFolderTraining
@@ -19,23 +18,10 @@ ignoreNegatives = True  # Ignore groups assigned with a negative index?
 timeCutOff = 1 # Three minutes
 
 #%% Load and pre-process data
+modelPath = 'SavedModels/ChromAlignNet-A-01-r01-Checkpoint/'
+modelFile = 'ChromAlignNet-A-01-r01-Checkpoint-006'
 
-loadTime = time.time()
-
-modelPath = 'SavedModels/'
-modelFile = 'ChromAlignNet'
-#dataPath = '../Data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/'
-#dataPath = '../Data/2018-04-30-ExtractedPeaks-Air115-WithMassSlice/'
-#dataPath = '../Data/2018-04-30-ExtractedPeaks-Air143-WithMassSlice/'
 dataPath = '../Data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
-#dataPath = '../Data/2018-05-01-ExtractedPeaks-Breath103-WithMassSlice/'
-#dataPath = '../Data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/'
-#dataPath = '../Data/2018-05-14-ExtractedPeaks-Breath88-WithMassSlice-All/'
-
-#dataPath = '../Data/2018-04-23-ExtractedPeaks-Air103-FullTime10Files/'
-#dataPath = '../Data/2018-05-29-ExtractedPeaks-Breath73-FullTime10Files/'
-
-
 
 infoFile = 'PeakData-WithGroup.csv'
 if os.path.isfile(os.path.join(dataPath, infoFile)):
@@ -46,136 +32,89 @@ else:
 sequenceFile = 'WholeSequence.csv'
 
 
-
 ### Load peak and mass slice profiles
+def prepareDataForPrediction(dataPath, infoFile, sequenceFile):
+    loadTime = time.time()
 
-infoDf, peakDf, massProfileDf, sequenceDf, peakDfOrig, peakDfMax = loadData(dataPath, infoFile, sequenceFile)
+    infoDf, peakDf, massProfileDf, sequenceDf, peakDfOrig, peakDfMax = loadData(dataPath, infoFile, sequenceFile)
 
-sequence_length = 600  # Specified by the model
-print(sequence_length)
+    if ignoreNegatives and realGroupsAvailable:
+        negatives = infoDf['Group'] < 0
+        infoDf = infoDf[~negatives]
+        peakDf = peakDf[~negatives]
+        peakDfOrig = peakDfOrig[~negatives]
+        peakDfMax = peakDfMax[~negatives]
+        massProfileDf = massProfileDf[~negatives]
+        infoDf.reset_index(inplace = True, drop = False)
+        peakDf.reset_index(inplace = True, drop = True)
+        peakDfOrig.reset_index(inplace = True, drop = True)
+        peakDfMax.reset_index(inplace = True, drop = True)
+        massProfileDf.reset_index(inplace = True, drop = True)
+        print("Negative index ignored: {}".format(np.sum(negatives)))
 
-if ignoreNegatives and realGroupsAvailable:
-    negatives = infoDf['Group'] < 0
-    infoDf = infoDf[~negatives]
-    peakDf = peakDf[~negatives]
-    peakDfOrig = peakDfOrig[~negatives]
-    peakDfMax = peakDfMax[~negatives]
-    massProfileDf = massProfileDf[~negatives]
-    infoDf.reset_index(inplace = True, drop = False)
-    peakDf.reset_index(inplace = True, drop = True)
-    peakDfOrig.reset_index(inplace = True, drop = True)
-    peakDfMax.reset_index(inplace = True, drop = True)
-    massProfileDf.reset_index(inplace = True, drop = True)
-    print("Negative index ignored: {}".format(np.sum(negatives)))
+    keepIndex = (pd.notnull(peakDf).all(1)) & (pd.notnull(massProfileDf).all(1))
+    #infoDf = infoDf[keepIndex]
+    #peakDf = peakDf[keepIndex]
+    #massProfileDf = massProfileDf[keepIndex]
 
-keepIndex = (pd.notnull(peakDf).all(1)) & (pd.notnull(massProfileDf).all(1))
-#infoDf = infoDf[keepIndex]
-#peakDf = peakDf[keepIndex]
-#massProfileDf = massProfileDf[keepIndex]
+    print("Dropped rows: {}".format(np.sum(keepIndex == False)))
+    print(np.flatnonzero(keepIndex == False))
 
+    surroundsDf = getChromatographSegmentDf(infoDf, sequenceDf, sequence_length = 600)
 
-print("Dropped rows: {}".format(np.sum(keepIndex == False)))
-print(np.flatnonzero(keepIndex == False))
+    #%% Generate data combinations
+    comparisons = generateCombinationIndices(infoDf[keepIndex], timeCutOff = timeCutOff, returnY = False)
+    x1 = comparisons[:,0]
+    x2 = comparisons[:,1]
 
+    x1Time = infoDf.loc[x1]['peakMaxTime'].values
+    x2Time = infoDf.loc[x2]['peakMaxTime'].values
+    dataTimeDiff = abs(x1Time - x2Time)
+    dataPeakProfile1 = peakDf.loc[x1].values
+    dataPeakProfile2 = peakDf.loc[x2].values
+    dataMassProfile1 = massProfileDf.loc[x1].values
+    dataMassProfile2 = massProfileDf.loc[x2].values
+    sequenceProfile1 = surroundsDf.loc[x1].values
+    sequenceProfile2 = surroundsDf.loc[x2].values
 
-# Create surroundsDf  (Doing it down here to avoid having to reset the index if ignoring negatives)
-peaks = len(peakDf)
-surroundsDf = np.zeros((peaks, sequence_length))
-peakTimes = infoDf['peakMaxTime']
-files = infoDf['File'].apply(str)
-timeIdx = np.argmin(np.abs(peakTimes.values.reshape((1,-1)) - sequenceDf.columns.values.reshape((-1,1))), axis = 0)
-for i in range(peaks):
-    seq = np.zeros(sequence_length)
-    t = timeIdx[i] - sequence_length // 2
-    if t < 0:
-        seq[-t:] = sequenceDf.loc[files.iloc[i]].iloc[:(timeIdx[i] + sequence_length // 2)].copy()
-    else:
-        insert = sequenceDf.loc[files.iloc[i]].iloc[(timeIdx[i] - sequence_length // 2): (timeIdx[i] + sequence_length // 2)].copy()
-        seq[:len(insert)] = insert    
-    
-    idx = seq > 0
-    seq[idx] = seq[idx] - np.min(seq[idx])
-    surroundsDf[i] = seq
-surroundsDf = pd.DataFrame(surroundsDf)
+    samples, max_peak_seq_length = dataPeakProfile1.shape
+    _, max_mass_seq_length = dataMassProfile1.shape
+    _, sequence_length = sequenceProfile1.shape
 
+    print('Number of samples:', samples)
+    print('Max peak sequence length:', max_peak_seq_length)
+    print('Max mass sequence length:', max_mass_seq_length)
+    print('Surrounds sequence length:', sequence_length)
 
-#%% Generate data combinations
+    print('Time to load and generate samples:', round((time.time() - loadTime)/60, 2), 'min')
 
-comparisons = np.array(list(itertools.combinations(infoDf[keepIndex].index, 2)))
-x1 = comparisons[:,0]
-x2 = comparisons[:,1]
+    prediction_data = [dataMassProfile1, dataMassProfile2,
+                        dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
+                        dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
+                        sequenceProfile1.reshape((samples, sequence_length, 1)),
+                        sequenceProfile2.reshape((samples, sequence_length, 1)),
+                        dataTimeDiff]
 
-x1Time = infoDf.loc[x1]['peakMaxTime'].values
-x2Time = infoDf.loc[x2]['peakMaxTime'].values
-dataTimeDiff = abs(x1Time - x2Time)
-withinTimeCutOff = dataTimeDiff < timeCutOff
+    return prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig
 
-comparisons = comparisons[withinTimeCutOff]
-x1 = comparisons[:,0]
-x2 = comparisons[:,1]
-dataTimeDiff = dataTimeDiff[withinTimeCutOff]
-x1Time = x1Time[withinTimeCutOff]
-x2Time = x2Time[withinTimeCutOff]
-dataPeakProfile1 = peakDf.loc[x1].values
-dataPeakProfile2 = peakDf.loc[x2].values
-dataMassProfile1 = massProfileDf.loc[x1].values
-dataMassProfile2 = massProfileDf.loc[x2].values
-sequenceProfile1 = surroundsDf.loc[x1].values
-sequenceProfile2 = surroundsDf.loc[x2].values
+def runPrediction(prediction_data, modelPath, modelFile):
+    #%% Predict
+    K.clear_session()
+    predictTime = time.time()
+    ### Load model
+    model = load_model(os.path.join(modelPath, modelFile) + '.h5')
 
+    prediction = model.predict(prediction_data,
+                                verbose = 1)
+    predAll = prediction
+    prediction = prediction[0]  # Only take the main outcome
 
-samples, max_peak_seq_length = dataPeakProfile1.shape
-_, max_mass_seq_length = dataMassProfile1.shape
-_, sequence_length = sequenceProfile1.shape
+    #print('Time to predict:', round((time.time() - predictTime)/60, 2), 'min')
+    print('Time to predict:', time.time() - predictTime, 'sec')
+    return prediction
 
-
-print('Number of samples:', samples)
-print('Max peak sequence length:', max_peak_seq_length)
-print('Max mass sequence length:', max_mass_seq_length)
-print('Surrounds sequence length:', sequence_length)
-
-
-def printShapes():
-    print('dataTimeDiff:', dataTimeDiff.shape)
-    print('dataPeakProfile1:', dataPeakProfile1.shape)
-    print('dataPeakProfile2:', dataPeakProfile2.shape)
-    print('dataMassProfile1:', dataMassProfile1.shape)
-    print('dataMassProfile2:', dataMassProfile2.shape)
-    print('sequenceProfile1:', sequenceProfile1.shape)
-    print('sequenceProfile2:', sequenceProfile2.shape)
-
-
-print('Time to load and generate samples:', round((time.time() - loadTime)/60, 2), 'min')
-#%% Predict
-
-
-
-#for _ in range(5):
-K.clear_session()
-
-predictTime = time.time()
-
-### Load model
-model = load_model(os.path.join(modelPath, modelFile) + '.h5')
-
-
-prediction = model.predict([dataMassProfile1, dataMassProfile2,
-                            dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
-                            dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
-                            sequenceProfile1.reshape((samples, sequence_length, 1)),
-                            sequenceProfile2.reshape((samples, sequence_length, 1)),
-                            dataTimeDiff],
-                            verbose = 1)
-
-predAll = prediction
-prediction = prediction[0]  # Only take the main outcome
-
-#print('Time to predict:', round((time.time() - predictTime)/60, 2), 'min')
-print('Time to predict:', time.time() - predictTime, 'sec')
 
 #%% Group and cluster
-
-
 def getDistances(prediction):
     distances = 1 / prediction
     return distances
@@ -421,7 +360,9 @@ def groupOverlap(assignedGroups, realGroups):
     return (iouSum / len(realGroups) + iouSum / len(assignedGroups)) / 2
 
 
-def printConfusionMatrix(prediction):
+def printConfusionMatrix(prediction, comparisons):
+    x1 = comparisons[:,0]
+    x2 = comparisons[:,1]
     p = np.round(prediction).astype(int).reshape((-1))
     g1 = infoDf.loc[x1]['Group'].values
     g2 = infoDf.loc[x2]['Group'].values
@@ -435,43 +376,38 @@ def printConfusionMatrix(prediction):
 
 
 
-def getWrongCases(saveName = None):
-    wrongCases = comparisons[(p != truth)]
-    if saveName is not None:
-        np.savetxt(saveName + '.doc', wrongCases, fmt = '%d', delimiter='    ')
-    return wrongCases
+# def getWrongCases(saveName = None):
+#     wrongCases = comparisons[(p != truth)]
+#     if saveName is not None:
+#         np.savetxt(saveName + '.doc', wrongCases, fmt = '%d', delimiter='    ')
+#     return wrongCases
 
 
 
 ####
 
+if __name__ == "__main__":
+    prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig = prepareDataForPrediction(dataPath, infoFile, sequenceFile)
+    prediction = runPrediction(prediction_data, modelPath, modelFile)
 
-distanceMatrix = getDistanceMatrix(comparisons, prediction, clip = 10)
+    distanceMatrix = getDistanceMatrix(comparisons, prediction, clip = 10)
 
+    groups = assignGroups(distanceMatrix, threshold = 2)
 
-groups = assignGroups(distanceMatrix, threshold = 2)
+    alignTimes(groups, infoDf, 'AlignedTime')
+    if realGroupsAvailable:
+        realGroups = getRealGroupAssignments(infoDf)
+        alignTimes(realGroups, infoDf, 'RealAlignedTime')
 
-if realGroupsAvailable:
-    realGroups = getRealGroupAssignments(infoDf)
+    #plotSpectrumTogether(infoDf, peakDfMax, withReal = realGroupsAvailable)
+    plotSpectrumTogether(infoDf[infoDf['Group'] >= 0], peakDfMax[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
 
+    #plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDf[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
+    #logPeaks = np.log2(peakDfOrig)
+    #logPeaks[logPeaks < 0] = 0
+    plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDfOrig[infoDf['Group'] >= 0], withReal = realGroupsAvailable)  # Peaks not normalised
 
-
-alignTimes(groups, infoDf, 'AlignedTime')
-if realGroupsAvailable:
-    alignTimes(realGroups, infoDf, 'RealAlignedTime')
-
-
-#plotSpectrumTogether(infoDf, peakDfMax, withReal = realGroupsAvailable)
-plotSpectrumTogether(infoDf[infoDf['Group'] >= 0], peakDfMax[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
-
-
-#plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDf[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
-#logPeaks = np.log2(peakDfOrig)
-#logPeaks[logPeaks < 0] = 0
-plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDfOrig[infoDf['Group'] >= 0], withReal = realGroupsAvailable)  # Peaks not normalised
-
-
-if realGroupsAvailable:
-    print("Group Overlap:", round(groupOverlap(groups, realGroups),4))
-    print('---')
-    printConfusionMatrix(prediction)
+    if realGroupsAvailable:
+        print("Group Overlap:", round(groupOverlap(groups, realGroups),4))
+        print('---')
+        printConfusionMatrix(prediction, comparisons)
