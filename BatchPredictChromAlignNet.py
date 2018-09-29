@@ -6,8 +6,9 @@ import time
 import numpy as np
 import itertools
 import sys
-from keras.models import load_model
 import keras.backend as K
+from keras.models import load_model
+from PredictChromAlignNet import prepareDataForPrediction, runPrediction, getDistanceMatrix, assignGroups, getRealGroupAssignments, alignTimes, groupOverlap, printConfusionMatrix
 
 ## Changed the normalisation behaviour to fit the training file 2018-04-30-TrainClassifierSiamese-MultiFolderTraining
 ## Provided a maximum cut off time for the peak comparison to limit the number of combinations
@@ -40,7 +41,7 @@ saveNames = ['ModelTests-OnAir103.csv',
              'ModelTests-OnBreath88.csv']
 saveName = os.path.join(resultsPath,saveNames[j])
 
-modelPath = 'Saved Models/'
+modelPath = '../Code/Saved Models/'
 #modelFiles = ['2018-05-21-Siamese_Net-A-01',
 #              '2018-05-21-Siamese_Net-B-01',
 #              '2018-05-21-Siamese_Net-C-01',
@@ -48,7 +49,7 @@ modelPath = 'Saved Models/'
 #              '2018-05-21-Siamese_Net-E-01',
 #              '2018-05-21-Siamese_Net-F-01']
 
-modelFiles = '2018-05-28-Siamese_Net-C-'
+modelFiles = '2018-05-25-Siamese_Net-C-'
 
 dataPaths = ['../Data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/',
              '../Data/2018-04-30-ExtractedPeaks-Air115-WithMassSlice/',
@@ -62,42 +63,46 @@ dataPath = dataPaths[j]
 
 
 #%% Predict
+infoFile = 'PeakData-WithGroup.csv'
+if os.path.isfile(os.path.join(dataPath, infoFile)):
+    realGroupsAvailable = True
+else:
+    infoFile = 'PeakData.csv'
+    realGroupsAvailable = False
+sequenceFile = 'WholeSequence.csv'
+prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig = prepareDataForPrediction(dataPath, infoFile, sequenceFile)
 
-
-modelRepeats = ['f', 'g', 'h', 'i', 'j']
+# modelRepeats = ['f', 'g', 'h', 'i', 'j']
+modelRepeats = ['']
 
 for repeat in modelRepeats:
-    for i in range(1,20):
+    for i in range(1,15):
+        if i == 2: continue
 #    for i in range(1,7):
         modelFile = modelFiles + '{:02d}'.format(i) + repeat
+        print(modelFile)
 #        modelFile = modelFiles[i-1] + repeat
         
         modelNumber.append(i)
         
         predictTime = time.time()
         
-        ### Load model
+        prediction = runPrediction(prediction_data, modelPath, modelFile)
         
-        K.clear_session()
-        
-        siamese_net = load_model(os.path.join(modelPath, modelFile) + '.h5')
-        
-        if i == 2:
-            prediction = siamese_net.predict([dataMassProfile1, dataMassProfile2,
-    #                                      dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
-    #                                      dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
-                                          sequenceProfile1.reshape((samples, sequence_length, 1)),
-                                          sequenceProfile2.reshape((samples, sequence_length, 1)),
-                                          dataTimeDiff])
-        else:
-            prediction = siamese_net.predict([dataMassProfile1, dataMassProfile2,
-                                              dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
-                                              dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
-                                              sequenceProfile1.reshape((samples, sequence_length, 1)),
-                                              sequenceProfile2.reshape((samples, sequence_length, 1)),
-                                              dataTimeDiff])
-        
-        prediction = prediction[0]  # Only take the main outcome
+    #     if i == 2:
+    #         prediction = siamese_net.predict([dataMassProfile1, dataMassProfile2,
+    # #                                      dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
+    # #                                      dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
+    #                                       sequenceProfile1.reshape((samples, sequence_length, 1)),
+    #                                       sequenceProfile2.reshape((samples, sequence_length, 1)),
+    #                                       dataTimeDiff])
+    #     else:
+    #         prediction = siamese_net.predict([dataMassProfile1, dataMassProfile2,
+    #                                           dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
+    #                                           dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
+    #                                           sequenceProfile1.reshape((samples, sequence_length, 1)),
+    #                                           sequenceProfile2.reshape((samples, sequence_length, 1)),
+    #                                           dataTimeDiff])
         
         print('Time to predict:', round((time.time() - predictTime)/60, 2), 'min')
         predictionTimes.append(round((time.time() - predictTime)/60, 2))
@@ -129,7 +134,7 @@ for repeat in modelRepeats:
     #        print("Group Overlap:", round(groupOverlap(groups, realGroups),4))
             groupOverlaps.append(round(groupOverlap(groups, realGroups),4))
             print('---')
-            confusionMatrices.append(printConfusionMatrix())
+            confusionMatrices.append(printConfusionMatrix(prediction, infoDf, comparisons))
         
 
     CM_DF = pd.DataFrame(confusionMatrices, columns = ['True Positives', 'False Positives', 'False Negatives', 'True Negatives'])

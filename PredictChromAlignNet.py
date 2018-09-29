@@ -18,8 +18,10 @@ ignoreNegatives = True  # Ignore groups assigned with a negative index?
 timeCutOff = 1 # Three minutes
 
 #%% Load and pre-process data
-modelPath = 'SavedModels/ChromAlignNet-A-01-r01-Checkpoint/'
-modelFile = 'ChromAlignNet-A-01-r01-Checkpoint-006'
+# modelPath = 'SavedModels/ChromAlignNet-A-01-r01-Checkpoint/'
+# modelFile = 'ChromAlignNet-A-01-r01-Checkpoint-006'
+modelPath = '../Code/Saved Models/'
+modelFile = '2018-05-25-Siamese_Net-C-01'
 
 dataPath = '../Data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
 
@@ -102,7 +104,9 @@ def runPrediction(prediction_data, modelPath, modelFile):
     K.clear_session()
     predictTime = time.time()
     ### Load model
-    model = load_model(os.path.join(modelPath, modelFile) + '.h5')
+    loading = os.path.join(modelPath, modelFile) + '.h5'
+    print(loading)
+    model = load_model(loading)
 
     prediction = model.predict(prediction_data,
                                 verbose = 1)
@@ -360,7 +364,7 @@ def groupOverlap(assignedGroups, realGroups):
     return (iouSum / len(realGroups) + iouSum / len(assignedGroups)) / 2
 
 
-def printConfusionMatrix(prediction, comparisons):
+def printConfusionMatrix(prediction, infoDf, comparisons):
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
     p = np.round(prediction).astype(int).reshape((-1))
@@ -373,8 +377,13 @@ def printConfusionMatrix(prediction, comparisons):
     print('False positives: {} / {} = {:.3f}'.format(np.sum(p[~truth]), np.sum(~truth), np.mean(p[~truth])))
     print('False negatives: {} / {} = {:.3f}'.format(np.sum(p[truth] == 0), np.sum(truth), np.mean(p[truth] == 0)))
     print('True negatives: {} / {} = {:.3f}'.format(np.sum(p[~truth] == 0), np.sum(~truth), np.mean(p[~truth] == 0)))
+    
+    TP = np.mean(p[truth])
+    FP = np.mean(p[~truth])
+    FN = np.mean(p[truth] == 0)
+    TN = np.mean(p[~truth] == 0)
 
-
+    return (TP, FP, FN, TN)
 
 # def getWrongCases(saveName = None):
 #     wrongCases = comparisons[(p != truth)]
@@ -410,4 +419,4 @@ if __name__ == "__main__":
     if realGroupsAvailable:
         print("Group Overlap:", round(groupOverlap(groups, realGroups),4))
         print('---')
-        printConfusionMatrix(prediction, comparisons)
+        printConfusionMatrix(prediction, infoDf, comparisons)
