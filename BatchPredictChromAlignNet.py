@@ -18,7 +18,8 @@ from PredictChromAlignNet import prepareDataForPrediction, runPrediction, getDis
 
 ignoreNegatives = True  # Ignore groups assigned with a negative index?
 timeCutOff = 3  # Three minutes
-modelRepeats = range(1,11)
+modelRepeats = range(1,2)
+modelNumbers = [20, 21, 26] # range(1, 28)
 modelNames = {1:'A', 2:'B', 3:'C', 4:'D', 5:'E', 6:'F', 7:'G'}   # XRW
 noPeakProfileModels = [2, 20, 22, 24, 26]  # Models where ignorePeakProfile = True
 
@@ -44,7 +45,7 @@ saveNames = ['ModelTests-OnAir103.csv',
              'ModelTests-OnBreath88.csv']
 saveName = os.path.join(resultsPath,saveNames[j])
 
-modelPath = '../Code/Saved Models/'
+modelPath = 'SavedModels/'
 #modelFiles = ['2018-05-21-Siamese_Net-A-01',
 #              '2018-05-21-Siamese_Net-B-01',
 #              '2018-05-21-Siamese_Net-C-01',
@@ -52,7 +53,7 @@ modelPath = '../Code/Saved Models/'
 #              '2018-05-21-Siamese_Net-E-01',
 #              '2018-05-21-Siamese_Net-F-01']
 
-modelFiles = '2018-05-25-Siamese_Net-C-'
+modelFiles = 'ChromAlignNet-A-'
 
 dataPaths = ['../Data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/',
              '../Data/2018-04-30-ExtractedPeaks-Air115-WithMassSlice/',
@@ -87,12 +88,9 @@ else:
 sequenceFile = 'WholeSequence.csv'
 
 
-# modelRepeats = ['f', 'g', 'h', 'i', 'j']
-modelRepeats = ['']
 
 for repeat in modelRepeats:
-    for i in range(1,15):
-
+    for i in modelNumbers:
 #    for i in range(1,7):
 #    for i in range(len(modelFiles)):   # XRW -- also need to clean up this bit more
         prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig = prepareDataForPrediction(dataPath, infoFile, sequenceFile, ignorePeakProfile = True if i in noPeakProfileModels else False)
@@ -140,7 +138,7 @@ for repeat in modelRepeats:
             confusionMatrices.append(printConfusionMatrix(prediction, infoDf, comparisons))
         
 
-    CM_DF = pd.DataFrame(confusionMatrices, columns = ['True Positives', 'False Positives', 'False Negatives', 'True Negatives'])
+    CM_DF = pd.DataFrame(confusionMatrices, columns = ['True Positives', 'False Positives', 'False Positives - Ignore Neg Indices'])
     
     df = pd.concat([CM_DF, pd.DataFrame(groupOverlaps, columns = ['Group Overlaps']),
                                         pd.DataFrame(predictionTimes, columns = ['Prediction Times'])], axis = 1)

@@ -15,20 +15,20 @@ from utils import loadData, getChromatographSegmentDf, generateCombinationIndice
 
 #%% Options
 
-ignoreNegatives = True  # Ignore groups assigned with a negative index?
-timeCutOff = 1 # Three minutes
+ignoreNegatives = False  # Ignore groups assigned with a negative index?
+timeCutOff = 3 # Three minutes
 
 #%% Load and pre-process data
 modelPath = 'SavedModels/'
-modelFile = 'ChromAlignNet-A-26-r01'
+modelFile = 'ChromAlignNet-A-20-r01'
 # modelPath = '../Code/Saved Models/'
 # modelFile = '2018-05-25-Siamese_Net-C-01'
 
 # TODO - Make this detected automatically from the model or definition file
 ignorePeakProfile = True
 
-dataPath = 'data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
-# dataPath = 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/'
+# dataPath = 'data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
+dataPath = 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/'
 
 infoFile = 'PeakData-WithGroup.csv'
 if os.path.isfile(os.path.join(dataPath, infoFile)):
@@ -177,6 +177,7 @@ def assignGroups(distanceMatrix, threshold = 2):
 def getRealGroupAssignments(infoDf):
     groups = {}
     for group, indexes in infoDf.groupby('Group').groups.items():
+        if group < 0: continue  # Don't align negative groups. Leave them with their original times
         groups[group] = set(indexes)
     return groups
 
@@ -256,7 +257,7 @@ def plotSpectrumTogether(infoDf, maxValues, withReal = False, saveName = None):
         plt.show()
 
 
-def plotPeaks(times, infoDf, peakDf, minTime, maxTime, resolution = 1/300, buffer = 5):
+def plotPeaks(times, infoDf, peakDf, minTime, maxTime, resolution = 1/300, buffer = 10):
     '''
     resolution = minutes per index step
     '''
@@ -275,7 +276,8 @@ def plotPeaks(times, infoDf, peakDf, minTime, maxTime, resolution = 1/300, buffe
     
     times = np.linspace(minTime - resolution * buffer, maxTime + resolution * buffer, timeSteps)
     return peaks, times
-        
+
+
 def plotPeaksTogether(infoDf, peakDf, withReal = False, saveName = None):
     minTime = min(infoDf['startTime'])
     maxTime = max(infoDf['endTime'])
@@ -386,29 +388,26 @@ def printConfusionMatrix(prediction, infoDf, comparisons):
     g1 = infoDf.loc[x1]['Group'].values
     g2 = infoDf.loc[x2]['Group'].values
 
+    keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
+    truth = (g1 == g2)
+    truth_ignore_neg = (g1[keep] == g2[keep])
+    p_ignore_neg = p[keep]
 
-
-    keep = (g1 != -1) & (g2 != -1)  # Ignore index of -1
-    truth = (g1[keep] == g2[keep])
-    p = p[keep]
-    print('True positives: {} / {} = {:.3f}'.format(np.sum(p[truth]), np.sum(truth), np.mean(p[truth])))
+    print('True positives: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(truth_ignore_neg), np.mean(p_ignore_neg[truth_ignore_neg])))
+    print('False positives - ignore negative indices: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[~truth_ignore_neg]), np.sum(~truth_ignore_neg), np.mean(p_ignore_neg[~truth_ignore_neg])))
     print('False positives: {} / {} = {:.3f}'.format(np.sum(p[~truth]), np.sum(~truth), np.mean(p[~truth])))
-    print('False negatives: {} / {} = {:.3f}'.format(np.sum(p[truth] == 0), np.sum(truth), np.mean(p[truth] == 0)))
-    print('True negatives: {} / {} = {:.3f}'.format(np.sum(p[~truth] == 0), np.sum(~truth), np.mean(p[~truth] == 0)))
     
-    TP = np.mean(p[truth])
+    TP = np.mean(p_ignore_neg[truth_ignore_neg])
+    FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])
     FP = np.mean(p[~truth])
-    FN = np.mean(p[truth] == 0)
-    TN = np.mean(p[~truth] == 0)
 
-    return (TP, FP, FN, TN)
+    return (TP, FP_ignore_neg, FP)
 
 # def getWrongCases(saveName = None):
 #     wrongCases = comparisons[(p != truth)]
 #     if saveName is not None:
 #         np.savetxt(saveName + '.doc', wrongCases, fmt = '%d', delimiter='    ')
 #     return wrongCases
-
 
 
 ####
@@ -429,10 +428,13 @@ if __name__ == "__main__":
         print('---')
         printConfusionMatrix(prediction, infoDf, comparisons)
 
-    #plotSpectrumTogether(infoDf, peakDfMax, withReal = realGroupsAvailable)
-    plotSpectrumTogether(infoDf[infoDf['Group'] >= 0], peakDfMax[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
+    plotSpectrumTogether(infoDf, peakDfMax, withReal = realGroupsAvailable, saveName = 'SpectrumAll')
+    if not ignoreNegatives:
+        plotSpectrumTogether(infoDf[infoDf['Group'] >= 0], peakDfMax[infoDf['Group'] >= 0], withReal = realGroupsAvailable, saveName = 'SpectrumNonNeg')
 
     #plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDf[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
     #logPeaks = np.log2(peakDfOrig)
     #logPeaks[logPeaks < 0] = 0
-    plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDfOrig[infoDf['Group'] >= 0], withReal = realGroupsAvailable)  # Peaks not normalised
+    plotPeaksTogether(infoDf, peakDfOrig, withReal = realGroupsAvailable, saveName = 'PeaksAll')
+    if not ignoreNegatives:
+        plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDfOrig[infoDf['Group'] >= 0], withReal = realGroupsAvailable, saveName = 'PeaksNonNeg')  # Peaks not normalised
