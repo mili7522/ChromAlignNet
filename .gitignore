@@ -3,3 +3,5 @@ data/
 results/
 .vscode/settings.json
 __pycache__/
+TrainClassifierSiameseCN-MultiFolderTraining.py
+FitSiameseCN-Batch.py

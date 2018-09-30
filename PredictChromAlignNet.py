@@ -1,9 +1,10 @@
 import pandas as pd
-import os
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import time
-import numpy as np
+import sys
+import os
 import tensorflow.keras.backend as K
 from tensorflow.keras.models import load_model
 from utils import loadData, getChromatographSegmentDf, generateCombinationIndices
@@ -19,14 +20,15 @@ timeCutOff = 1 # Three minutes
 
 #%% Load and pre-process data
 modelPath = 'SavedModels/'
-modelFile = 'ChromAlignNet-A-21-r01'
+modelFile = 'ChromAlignNet-A-26-r01'
 # modelPath = '../Code/Saved Models/'
 # modelFile = '2018-05-25-Siamese_Net-C-01'
 
 # TODO - Make this detected automatically from the model or definition file
-ignorePeakProfile = False
+ignorePeakProfile = True
 
-dataPath = '../Data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
+dataPath = 'data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
+# dataPath = 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/'
 
 infoFile = 'PeakData-WithGroup.csv'
 if os.path.isfile(os.path.join(dataPath, infoFile)):
@@ -92,6 +94,10 @@ def prepareDataForPrediction(dataPath, infoFile, sequenceFile, ignorePeakProfile
     print('Surrounds sequence length:', sequence_length)
 
     print('Time to load and generate samples:', round((time.time() - loadTime)/60, 2), 'min')
+    print('\n')   # XRW
+    print('===============\nPredictions:\n---')   # XRW
+    sys.stdout.flush()   # XRW
+
 
     if ignorePeakProfile:
         prediction_data = [dataMassProfile1, dataMassProfile2,
@@ -419,6 +425,9 @@ if __name__ == "__main__":
     if realGroupsAvailable:
         realGroups = getRealGroupAssignments(infoDf)
         alignTimes(realGroups, infoDf, 'RealAlignedTime')
+        print("Group Overlap:", round(groupOverlap(groups, realGroups),4))
+        print('---')
+        printConfusionMatrix(prediction, infoDf, comparisons)
 
     #plotSpectrumTogether(infoDf, peakDfMax, withReal = realGroupsAvailable)
     plotSpectrumTogether(infoDf[infoDf['Group'] >= 0], peakDfMax[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
@@ -427,8 +436,3 @@ if __name__ == "__main__":
     #logPeaks = np.log2(peakDfOrig)
     #logPeaks[logPeaks < 0] = 0
     plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDfOrig[infoDf['Group'] >= 0], withReal = realGroupsAvailable)  # Peaks not normalised
-
-    if realGroupsAvailable:
-        print("Group Overlap:", round(groupOverlap(groups, realGroups),4))
-        print('---')
-        printConfusionMatrix(prediction, infoDf, comparisons)

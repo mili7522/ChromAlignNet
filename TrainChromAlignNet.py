@@ -12,7 +12,7 @@ from utils import loadData, printShapes, getChromatographSegmentDf, generateComb
 
 
 #%% Options
-epochs = 12
+epochs = 50
 batch_size = 128
 validation_split = 0.1
 adamOptimizerOptions = {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999}

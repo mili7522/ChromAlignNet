@@ -18,6 +18,9 @@ from PredictChromAlignNet import prepareDataForPrediction, runPrediction, getDis
 
 ignoreNegatives = True  # Ignore groups assigned with a negative index?
 timeCutOff = 3  # Three minutes
+modelRepeats = range(1,11)
+modelNames = {1:'A', 2:'B', 3:'C', 4:'D', 5:'E', 6:'F', 7:'G'}   # XRW
+noPeakProfileModels = [2, 20, 22, 24, 26]  # Models where ignorePeakProfile = True
 
 #%% Load and pre-process data
 
@@ -61,6 +64,18 @@ dataPaths = ['../Data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/',
 
 dataPath = dataPaths[j]
 
+# XRW
+# Check input, make sure we're using the correct data file name and where 
+# the results will be saved to. 
+#   Using manual flush to force the printing, for situations when we are 
+# checking the log file mid-calculation. 
+
+print('Predicting for data: ')
+print(dataPath)
+print('Results will be saved to: ')
+print(saveName)
+sys.stdout.flush()
+
 
 #%% Predict
 infoFile = 'PeakData-WithGroup.csv'
@@ -70,39 +85,27 @@ else:
     infoFile = 'PeakData.csv'
     realGroupsAvailable = False
 sequenceFile = 'WholeSequence.csv'
-prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig = prepareDataForPrediction(dataPath, infoFile, sequenceFile)
+
 
 # modelRepeats = ['f', 'g', 'h', 'i', 'j']
 modelRepeats = ['']
 
 for repeat in modelRepeats:
     for i in range(1,15):
-        if i == 2: continue
+
 #    for i in range(1,7):
-        modelFile = modelFiles + '{:02d}'.format(i) + repeat
-        print(modelFile)
-#        modelFile = modelFiles[i-1] + repeat
+#    for i in range(len(modelFiles)):   # XRW -- also need to clean up this bit more
+        prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig = prepareDataForPrediction(dataPath, infoFile, sequenceFile, ignorePeakProfile = True if i in noPeakProfileModels else False)
+        modelFile = modelFiles + '{:02d}'.format(i) + '-r' + '{:02d}'.format(repeat)     # for submodel
+        print('Model used: ', modelFile)   #XRW
+#        modelFile = modelFiles[i] + '-r' + '{:02d}'.format(repeat)   # XRW
         
-        modelNumber.append(i)
+        # modelNumber.append(modelNames[i+1])   # XRW -- for full models
+        modelNumber.append(i)   # XRW -- for sub-models
         
         predictTime = time.time()
         
         prediction = runPrediction(prediction_data, modelPath, modelFile)
-        
-    #     if i == 2:
-    #         prediction = siamese_net.predict([dataMassProfile1, dataMassProfile2,
-    # #                                      dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
-    # #                                      dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
-    #                                       sequenceProfile1.reshape((samples, sequence_length, 1)),
-    #                                       sequenceProfile2.reshape((samples, sequence_length, 1)),
-    #                                       dataTimeDiff])
-    #     else:
-    #         prediction = siamese_net.predict([dataMassProfile1, dataMassProfile2,
-    #                                           dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
-    #                                           dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
-    #                                           sequenceProfile1.reshape((samples, sequence_length, 1)),
-    #                                           sequenceProfile2.reshape((samples, sequence_length, 1)),
-    #                                           dataTimeDiff])
         
         print('Time to predict:', round((time.time() - predictTime)/60, 2), 'min')
         predictionTimes.append(round((time.time() - predictTime)/60, 2))
