@@ -1,7 +1,12 @@
 import tensorflow.keras.backend as K
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D, LSTM, Bidirectional
+from tensorflow.keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D, GRU
 
+## Variant 3 + 13
+## Peak encoder simplified
+## Dropout on CNN encoder (end only) increased to 50%. Encoder neurons increased to 30
+
+ignorePeakProfile = False
 
 def define_model(max_mass_seq_length, sequence_length):
     ### Mass profile model
@@ -31,17 +36,15 @@ def define_model(max_mass_seq_length, sequence_length):
     P_in = Input(peak_input_shape)
     peak_left_input = Input(peak_input_shape)
     peak_right_input = Input(peak_input_shape)
-    
-    
-    P = Bidirectional(LSTM(64, return_sequences = True))(P_in)
+
+    P = GRU(32, return_sequences = True)(P_in)
     P = Dropout(0.2)(P)
-    P = Bidirectional(LSTM(64, return_sequences = True))(P)
+    P = GRU(32, return_sequences = True)(P)
     P = Dropout(0.2)(P)
-    _, state_h, state_c = LSTM(10, return_sequences = False, return_state = True)(P)
-    peak_output = Concatenate(axis = -1)([state_h, state_c])
-    peak_output = Dropout(0.2)(peak_output)
+    _, state_h = GRU(10, return_sequences = False, return_state = True)(P)
+    peak_output = Dropout(0.2)(state_h)
     peak_output = Dense(10)(peak_output)
-    
+
     peak_encoder = Model(inputs = P_in, outputs = peak_output)
     
     peak_encoded_l = peak_encoder(peak_left_input)
@@ -88,8 +91,8 @@ def define_model(max_mass_seq_length, sequence_length):
     F1 = Flatten()(F1)
     F2 = Flatten()(F2)
     surround_output = Concatenate(axis = -1)([F1, F2])
-    surround_output = Dropout(0.2)(surround_output)
-    surround_output = Dense(10)(surround_output)
+    surround_output = Dropout(0.5)(surround_output)
+    surround_output = Dense(30)(surround_output)
     
     surround_encoder = Model(inputs = S_in, outputs = surround_output)
     

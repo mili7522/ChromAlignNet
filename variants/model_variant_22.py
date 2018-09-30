@@ -2,6 +2,11 @@ import tensorflow.keras.backend as K
 from tensorflow.keras.models import Model, Sequential
 from tensorflow.keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D, LSTM, Bidirectional
 
+## Variant 2 + 13
+## No peak encoder
+## Dropout on CNN encoder (end only) increased to 50%. Encoder neurons increased to 30
+
+ignorePeakProfile = True
 
 def define_model(max_mass_seq_length, sequence_length):
     ### Mass profile model
@@ -26,31 +31,31 @@ def define_model(max_mass_seq_length, sequence_length):
     mass_prediction = Dense(1, activation='sigmoid', name = 'mass_prediction')(mass_both)
     
     
-    ### Peak profile model
-    peak_input_shape = (None, 1)  # Variable sequence length
-    P_in = Input(peak_input_shape)
-    peak_left_input = Input(peak_input_shape)
-    peak_right_input = Input(peak_input_shape)
+    # ### Peak profile model
+    # peak_input_shape = (None, 1)  # Variable sequence length
+    # P_in = Input(peak_input_shape)
+    # peak_left_input = Input(peak_input_shape)
+    # peak_right_input = Input(peak_input_shape)
     
     
-    P = Bidirectional(LSTM(64, return_sequences = True))(P_in)
-    P = Dropout(0.2)(P)
-    P = Bidirectional(LSTM(64, return_sequences = True))(P)
-    P = Dropout(0.2)(P)
-    _, state_h, state_c = LSTM(10, return_sequences = False, return_state = True)(P)
-    peak_output = Concatenate(axis = -1)([state_h, state_c])
-    peak_output = Dropout(0.2)(peak_output)
-    peak_output = Dense(10)(peak_output)
+    # P = Bidirectional(LSTM(64, return_sequences = True))(P_in)
+    # P = Dropout(0.2)(P)
+    # P = Bidirectional(LSTM(64, return_sequences = True))(P)
+    # P = Dropout(0.2)(P)
+    # _, state_h, state_c = LSTM(10, return_sequences = False, return_state = True)(P)
+    # peak_output = Concatenate(axis = -1)([state_h, state_c])
+    # peak_output = Dropout(0.2)(peak_output)
+    # peak_output = Dense(10)(peak_output)
     
-    peak_encoder = Model(inputs = P_in, outputs = peak_output)
+    # peak_encoder = Model(inputs = P_in, outputs = peak_output)
     
-    peak_encoded_l = peak_encoder(peak_left_input)
-    peak_encoded_r = peak_encoder(peak_right_input)
+    # peak_encoded_l = peak_encoder(peak_left_input)
+    # peak_encoded_r = peak_encoder(peak_right_input)
     
     
-    peak_both = Subtract()([peak_encoded_l, peak_encoded_r])
-    peak_both = Lambda(lambda x: K.abs(x))(peak_both)
-    peak_prediction = Dense(1, activation='sigmoid', name = 'peak_prediction')(peak_both)
+    # peak_both = Subtract()([peak_encoded_l, peak_encoded_r])
+    # peak_both = Lambda(lambda x: K.abs(x))(peak_both)
+    # peak_prediction = Dense(1, activation='sigmoid', name = 'peak_prediction')(peak_both)
     
     
     ### Surrounding profile model
@@ -88,8 +93,8 @@ def define_model(max_mass_seq_length, sequence_length):
     F1 = Flatten()(F1)
     F2 = Flatten()(F2)
     surround_output = Concatenate(axis = -1)([F1, F2])
-    surround_output = Dropout(0.2)(surround_output)
-    surround_output = Dense(10)(surround_output)
+    surround_output = Dropout(0.5)(surround_output)
+    surround_output = Dense(30)(surround_output)
     
     surround_encoder = Model(inputs = S_in, outputs = surround_output)
     
@@ -106,7 +111,7 @@ def define_model(max_mass_seq_length, sequence_length):
     
     
     ### Combined model
-    combined_outputs = Lambda(lambda x: K.concatenate(x, axis = -1))([mass_both, peak_both, surround_both, time_diff])
+    combined_outputs = Lambda(lambda x: K.concatenate(x, axis = -1))([mass_both, surround_both, time_diff])
     
     combined_outputs = Dropout(0.2)(combined_outputs)  # The time data may be dropped directly
     combined_model = Dense(64, activation = 'relu')(combined_outputs)
@@ -115,8 +120,8 @@ def define_model(max_mass_seq_length, sequence_length):
     
     ### Build and compile
     
-    siamese_net = Model(inputs = [mass_left_input, mass_right_input, peak_left_input, peak_right_input,
+    siamese_net = Model(inputs = [mass_left_input, mass_right_input,
                                   surround_left_input, surround_right_input, time_diff],
-                        outputs = [combined_prediction, mass_prediction, peak_prediction, surround_prediction])
+                        outputs = [combined_prediction, mass_prediction, surround_prediction])
     
     return siamese_net

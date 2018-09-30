@@ -1,4 +1,5 @@
 SavedModels/
 data/
+results/
 .vscode/settings.json
 __pycache__/

@@ -18,10 +18,13 @@ ignoreNegatives = True  # Ignore groups assigned with a negative index?
 timeCutOff = 1 # Three minutes
 
 #%% Load and pre-process data
-# modelPath = 'SavedModels/ChromAlignNet-A-01-r01-Checkpoint/'
-# modelFile = 'ChromAlignNet-A-01-r01-Checkpoint-006'
-modelPath = '../Code/Saved Models/'
-modelFile = '2018-05-25-Siamese_Net-C-01'
+modelPath = 'SavedModels/'
+modelFile = 'ChromAlignNet-A-21-r01'
+# modelPath = '../Code/Saved Models/'
+# modelFile = '2018-05-25-Siamese_Net-C-01'
+
+# TODO - Make this detected automatically from the model or definition file
+ignorePeakProfile = False
 
 dataPath = '../Data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
 
@@ -35,7 +38,7 @@ sequenceFile = 'WholeSequence.csv'
 
 
 ### Load peak and mass slice profiles
-def prepareDataForPrediction(dataPath, infoFile, sequenceFile):
+def prepareDataForPrediction(dataPath, infoFile, sequenceFile, ignorePeakProfile = ignorePeakProfile):
     loadTime = time.time()
 
     infoDf, peakDf, massProfileDf, sequenceDf, peakDfOrig, peakDfMax = loadData(dataPath, infoFile, sequenceFile)
@@ -90,12 +93,18 @@ def prepareDataForPrediction(dataPath, infoFile, sequenceFile):
 
     print('Time to load and generate samples:', round((time.time() - loadTime)/60, 2), 'min')
 
-    prediction_data = [dataMassProfile1, dataMassProfile2,
-                        dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
-                        dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
-                        sequenceProfile1.reshape((samples, sequence_length, 1)),
-                        sequenceProfile2.reshape((samples, sequence_length, 1)),
-                        dataTimeDiff]
+    if ignorePeakProfile:
+        prediction_data = [dataMassProfile1, dataMassProfile2,
+                            sequenceProfile1.reshape((samples, sequence_length, 1)),
+                            sequenceProfile2.reshape((samples, sequence_length, 1)),
+                            dataTimeDiff]
+    else:
+        prediction_data = [dataMassProfile1, dataMassProfile2,
+                            dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
+                            dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
+                            sequenceProfile1.reshape((samples, sequence_length, 1)),
+                            sequenceProfile2.reshape((samples, sequence_length, 1)),
+                            dataTimeDiff]
 
     return prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig
 
@@ -370,6 +379,9 @@ def printConfusionMatrix(prediction, infoDf, comparisons):
     p = np.round(prediction).astype(int).reshape((-1))
     g1 = infoDf.loc[x1]['Group'].values
     g2 = infoDf.loc[x2]['Group'].values
+
+
+
     keep = (g1 != -1) & (g2 != -1)  # Ignore index of -1
     truth = (g1[keep] == g2[keep])
     p = p[keep]
