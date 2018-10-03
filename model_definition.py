@@ -1,122 +1,198 @@
 import tensorflow.keras.backend as K
 from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D, LSTM, Bidirectional
+from tensorflow.keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D, LSTM, Bidirectional, GRU
 
 
-def define_model(max_mass_seq_length, sequence_length):
-    ### Mass profile model
-    mass_input_shape = (max_mass_seq_length,)
-    mass_left_input = Input(mass_input_shape)
-    mass_right_input = Input(mass_input_shape)
-    
-    mass_encoder = Sequential()
-    mass_encoder.add(Dense(64, input_shape = mass_input_shape, activation = 'relu'))
-    mass_encoder.add(Dropout(0.2))
-    mass_encoder.add(Dense(64, activation = 'relu'))
-    mass_encoder.add(Dropout(0.2))
-    mass_encoder.add(Dense(10, activation = 'relu'))
-    
-    mass_encoded_l = mass_encoder(mass_left_input)
-    mass_encoded_r = mass_encoder(mass_right_input)
-    
-    
-    # Merge and compute L1 distance
-    mass_both = Subtract()([mass_encoded_l, mass_encoded_r])
-    mass_both = Lambda(lambda x: K.abs(x))(mass_both)
-    mass_prediction = Dense(1, activation='sigmoid', name = 'mass_prediction')(mass_both)
-    
-    
-    ### Peak profile model
-    peak_input_shape = (None, 1)  # Variable sequence length
-    P_in = Input(peak_input_shape)
-    peak_left_input = Input(peak_input_shape)
-    peak_right_input = Input(peak_input_shape)
-    
-    
-    P = Bidirectional(LSTM(64, return_sequences = True))(P_in)
-    P = Dropout(0.2)(P)
-    P = Bidirectional(LSTM(64, return_sequences = True))(P)
-    P = Dropout(0.2)(P)
-    _, state_h, state_c = LSTM(10, return_sequences = False, return_state = True)(P)
-    peak_output = Concatenate(axis = -1)([state_h, state_c])
-    peak_output = Dropout(0.2)(peak_output)
-    peak_output = Dense(10)(peak_output)
-    
-    peak_encoder = Model(inputs = P_in, outputs = peak_output)
-    
-    peak_encoded_l = peak_encoder(peak_left_input)
-    peak_encoded_r = peak_encoder(peak_right_input)
-    
-    
-    peak_both = Subtract()([peak_encoded_l, peak_encoded_r])
-    peak_both = Lambda(lambda x: K.abs(x))(peak_both)
-    peak_prediction = Dense(1, activation='sigmoid', name = 'peak_prediction')(peak_both)
-    
-    
-    ### Surrounding profile model
-    surround_input_shape = (sequence_length, 1)  # One channel
-    S_in = Input(surround_input_shape)
-    surround_left_input = Input(surround_input_shape)
-    surround_right_input = Input(surround_input_shape)
-    
-    # sequence_length of 600
-    F1 = Conv1D(filters = 3, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(S_in)
-    F1 = Conv1D(filters = 3, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(3)(F1)
-    # sequence_length of 200
-    F1 = Conv1D(filters = 6, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = Conv1D(filters = 6, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(2)(F1)
-    # sequence_length of 100
-    F1 = Conv1D(filters = 12, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = Conv1D(filters = 12, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(2)(F1)
-    # sequence_length of 50
-    F1 = Conv1D(filters = 24, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = Conv1D(filters = 24, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-    F1 = MaxPooling1D(2)(F1)
-    # sequence_length of 25
-    
-    F2 = Conv1D(filters = 3, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(S_in)
-    F2 = MaxPooling1D(3)(F2)  # Sequence length of 200
-    F2 = Conv1D(filters = 6, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F2)
-    F2 = MaxPooling1D(2)(F2)  # Sequence length of 100
-    F2 = Conv1D(filters = 12, kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F2)
-    F2 = MaxPooling1D(2)(F2)  # Sequence length of 50
+class ChromAlignModel:
+    def __init__(self, mass_network_neurons = 64, peak_network_neurons = 64, chromatogram_network_neurons = 64,
+                 mass_encoder_neurons = 10, peak_encoder_neurons = 10, chromatogram_encoder_neurons = 10,
+                 mass_dropout_percentage = 0.2, peak_dropout_percentage = 0.2, chromatogram_dropout_percentage = 0.2,
+                 number_of_left_convolution_stacks = 4, number_of_right_convolution_stacks = 3,
+                 chromatogram_convolution_dropout_percentage = 0, combined_output_neurons = 64,
+                 combined_output_dropout_percentage = 0.2, ignorePeakProfile = False):
+        self.mass_network_neurons = mass_network_neurons
+        self.peak_network_neurons = peak_network_neurons
+        self.chromatogram_network_neurons = chromatogram_network_neurons
+        self.mass_encoder_neurons = mass_encoder_neurons
+        self.peak_encoder_neurons = peak_encoder_neurons
+        self.chromatogram_encoder_neurons = chromatogram_encoder_neurons
+        self.mass_dropout_percentage = mass_dropout_percentage
+        self.peak_dropout_percentage = peak_dropout_percentage
+        self.chromatogram_dropout_percentage = chromatogram_dropout_percentage
+        self.number_of_left_convolution_stacks = number_of_left_convolution_stacks
+        self.number_of_right_convolution_stacks = number_of_right_convolution_stacks
+        self.chromatogram_convolution_dropout_percentage = chromatogram_convolution_dropout_percentage
+        self.combined_output_neurons = combined_output_neurons
+        self.combined_output_dropout_percentage = combined_output_dropout_percentage
+        self.ignorePeakProfile = ignorePeakProfile
 
-    
-    F1 = Flatten()(F1)
-    F2 = Flatten()(F2)
-    surround_output = Concatenate(axis = -1)([F1, F2])
-    surround_output = Dropout(0.2)(surround_output)
-    surround_output = Dense(10)(surround_output)
-    
-    surround_encoder = Model(inputs = S_in, outputs = surround_output)
-    
-    surround_encoded_l = surround_encoder(surround_left_input)
-    surround_encoded_r = surround_encoder(surround_right_input)
-    
-    surround_both = Subtract()([surround_encoded_l, surround_encoded_r])
-    surround_both = Lambda(lambda x: K.abs(x))(surround_both)
-    surround_prediction = Dense(1, activation='sigmoid', name = 'surround_prediction')(surround_both)    
-    
-    ### Time model
-    
-    time_diff = Input((1,))
-    
-    
-    ### Combined model
-    combined_outputs = Lambda(lambda x: K.concatenate(x, axis = -1))([mass_both, peak_both, surround_both, time_diff])
-    
-    combined_outputs = Dropout(0.2)(combined_outputs)  # The time data may be dropped directly
-    combined_model = Dense(64, activation = 'relu')(combined_outputs)
-    combined_prediction = Dense(1, activation = 'sigmoid', name = 'main_prediction')(combined_model)
-    
-    
-    ### Build and compile
-    
-    siamese_net = Model(inputs = [mass_left_input, mass_right_input, peak_left_input, peak_right_input,
-                                  surround_left_input, surround_right_input, time_diff],
-                        outputs = [combined_prediction, mass_prediction, peak_prediction, surround_prediction])
-    
-    return siamese_net
+    def make_siamese_component(self, encoder_model, left_input, right_input):
+        left_branch = encoder_model(left_input)
+        right_branch = encoder_model(right_input)
+        
+        # Merge and compute L1 distance
+        comparison = Subtract()([left_branch, right_branch])
+        comparison = Lambda(lambda x: K.abs(x))(comparison)
+
+        return comparison
+
+    def build_mass_encoder(self, max_mass_seq_length):
+        mass_input_shape = (max_mass_seq_length,)
+        mass_left_input = Input(mass_input_shape)
+        mass_right_input = Input(mass_input_shape)
+
+        mass_encoder = Sequential()
+        mass_encoder.add(Dense(self.mass_network_neurons, input_shape = mass_input_shape, activation = 'relu'))
+        mass_encoder.add(Dropout(self.mass_dropout_percentage))
+        mass_encoder.add(Dense(self.mass_network_neurons, activation = 'relu'))
+        mass_encoder.add(Dropout(self.mass_dropout_percentage))
+        mass_encoder.add(Dense(self.mass_encoder_neurons, activation = 'relu'))
+
+        mass_comparison = self.make_siamese_component(mass_encoder, mass_left_input, mass_right_input)
+        mass_prediction = Dense(1, activation = 'sigmoid', name = 'mass_prediction')(mass_comparison)
+
+        return mass_left_input, mass_right_input, mass_comparison, mass_prediction
+
+    def build_peak_encoder(self):
+        peak_input_shape = (None, 1)  # Variable sequence length
+        P_in = Input(peak_input_shape)
+        peak_left_input = Input(peak_input_shape)
+        peak_right_input = Input(peak_input_shape)
+        
+        P = Bidirectional(LSTM(self.peak_network_neurons, return_sequences = True))(P_in)
+        P = Dropout(self.peak_dropout_percentage)(P)
+        P = Bidirectional(LSTM(self.peak_network_neurons, return_sequences = True))(P)
+        P = Dropout(self.peak_dropout_percentage)(P)
+        _, state_h, state_c = LSTM(self.peak_encoder_neurons, return_sequences = False, return_state = True)(P)
+        peak_output = Concatenate(axis = -1)([state_h, state_c])
+        peak_output = Dropout(self.peak_dropout_percentage)(peak_output)
+        peak_output = Dense(self.peak_encoder_neurons)(peak_output)
+        
+        peak_encoder = Model(inputs = P_in, outputs = peak_output)
+
+        peak_comparison = self.make_siamese_component(peak_encoder, peak_left_input, peak_right_input)
+        peak_prediction = Dense(1, activation = 'sigmoid', name = 'peak_prediction')(peak_comparison)
+
+        return peak_left_input, peak_right_input, peak_comparison, peak_prediction
+
+    def build_chromatogram_encoder(self, sequence_length):
+        chromatogram_input_shape = (sequence_length, 1)  # One channel input
+        C_in = Input(chromatogram_input_shape)
+        chromatogram_left_input = Input(chromatogram_input_shape)
+        chromatogram_right_input = Input(chromatogram_input_shape)
+        
+        # Sequence_length of 600, 200, 100, 50, etc
+        initial_filter_number = 3
+        for i in range(self.number_of_left_convolution_stacks):
+            F1 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F1)
+            F1 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
+            F1 = MaxPooling1D(3 if i == 0 else 2)(F1)
+            if (self.chromatogram_convolution_dropout_percentage != 0) and (i != (self.number_of_left_convolution_stacks - 1)):
+                F1 = Dropout(self.chromatogram_convolution_dropout_percentage)(F1)
+        
+        # Sequence length of 600, 200, 100, 50, etc
+        for i in range(self.number_of_right_convolution_stacks):
+            F2 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F2)
+            F2 = MaxPooling1D(3 if i == 0 else 2)(F2)
+            if (self.chromatogram_convolution_dropout_percentage != 0) and (i != (self.number_of_right_convolution_stacks - 1)):
+                F2 = Dropout(self.chromatogram_convolution_dropout_percentage)(F2)
+
+        F1 = Flatten()(F1)
+        F2 = Flatten()(F2)
+        chromatogram_output = Concatenate(axis = -1)([F1, F2])
+        chromatogram_output = Dropout(self.chromatogram_dropout_percentage)(chromatogram_output)
+        chromatogram_output = Dense(self.chromatogram_encoder_neurons)(chromatogram_output)
+        
+        chromatogram_encoder = Model(inputs = C_in, outputs = chromatogram_output)
+        
+        chromatogram_comparison = self.make_siamese_component(chromatogram_encoder, chromatogram_left_input, chromatogram_right_input)
+        chromatogram_prediction = Dense(1, activation = 'sigmoid', name = 'surround_prediction')(chromatogram_comparison)    
+        
+        return chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction
+
+
+    def build_model(self, max_mass_seq_length, sequence_length):
+
+        mass_left_input, mass_right_input, mass_comparison, mass_prediction = self.build_mass_encoder(max_mass_seq_length)
+        if not self.ignorePeakProfile:
+            peak_left_input, peak_right_input, peak_comparison, peak_prediction = self.build_peak_encoder()
+        chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction = self.build_chromatogram_encoder(sequence_length)
+        time_diff = Input((1,))
+
+        if self.ignorePeakProfile:
+            components = [mass_comparison, chromatogram_comparison, time_diff]
+        else:
+            components = [mass_comparison, peak_comparison, chromatogram_comparison, time_diff]
+        combined_outputs = Lambda(lambda x: K.concatenate(x, axis = -1))(components)
+        
+        combined_outputs = Dropout(self.combined_output_dropout_percentage)(combined_outputs)
+        combined_model = Dense(self.combined_output_neurons, activation = 'relu')(combined_outputs)
+        combined_prediction = Dense(1, activation = 'sigmoid', name = 'main_prediction')(combined_model)
+
+        if self.ignorePeakProfile:
+            inputs = [mass_left_input, mass_right_input, chromatogram_left_input, chromatogram_right_input, time_diff]
+            outputs = [combined_prediction, mass_prediction, chromatogram_prediction]
+        else:
+            inputs = [mass_left_input, mass_right_input, peak_left_input, peak_right_input, chromatogram_left_input, chromatogram_right_input, time_diff]
+            outputs = [combined_prediction, mass_prediction, peak_prediction, chromatogram_prediction]
+
+        siamese_net = Model(inputs = inputs, outputs = outputs)
+
+        return siamese_net
+
+
+class SimplifiedPeakEncoderVariant(ChromAlignModel):
+    def build_peak_encoder(self):
+        peak_input_shape = (None, 1)  # Variable sequence length
+        P_in = Input(peak_input_shape)
+        peak_left_input = Input(peak_input_shape)
+        peak_right_input = Input(peak_input_shape)
+        
+        P = GRU(self.peak_network_neurons, return_sequences = True)(P_in)
+        P = Dropout(self.peak_dropout_percentage)(P)
+        P = GRU(self.peak_network_neurons, return_sequences = True)(P)
+        P = Dropout(self.peak_dropout_percentage)(P)
+        _, state_h = GRU(self.peak_encoder_neurons, return_sequences = False, return_state = True)(P)
+
+        peak_output = Dropout(self.peak_dropout_percentage)(state_h)
+        peak_output = Dense(self.peak_encoder_neurons)(peak_output)
+
+        peak_encoder = Model(inputs = P_in, outputs = peak_output)
+
+        peak_comparison = self.make_siamese_component(peak_encoder, peak_left_input, peak_right_input)
+        peak_prediction = Dense(1, activation = 'sigmoid', name = 'peak_prediction')(peak_comparison)
+
+        return peak_left_input, peak_right_input, peak_comparison, peak_prediction
+
+
+def getModelVariant(variant):
+    switcher = {
+        1: ChromAlignModel(),
+        2: ChromAlignModel(ignorePeakProfile = True),
+        3: SimplifiedPeakEncoderVariant(peak_network_neurons = 32),
+        4: ChromAlignModel(peak_dropout_percentage = 0.5),
+        5: ChromAlignModel(peak_encoder_neurons = 5),
+        6: ChromAlignModel(peak_dropout_percentage = 0.5, peak_encoder_neurons = 20),
+        7: ChromAlignModel(peak_dropout_percentage = 0.5, peak_encoder_neurons = 30),
+        8: ChromAlignModel(mass_encoder_neurons = 5),
+        9: ChromAlignModel(mass_dropout_percentage = 0.5, mass_encoder_neurons = 20),
+        10: ChromAlignModel(mass_dropout_percentage = 0.5, mass_encoder_neurons = 30),
+        11: ChromAlignModel(chromatogram_encoder_neurons = 5),
+        12: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 20),
+        13: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30),
+        14: ChromAlignModel(chromatogram_convolution_dropout_percentage = 0.2),
+        15: ChromAlignModel(chromatogram_convolution_dropout_percentage = 0.5),
+        16: ChromAlignModel(number_of_left_convolution_stacks = 5),
+        17: ChromAlignModel(number_of_left_convolution_stacks = 3),
+        18: ChromAlignModel(number_of_right_convolution_stacks = 4),
+        19: ChromAlignModel(number_of_right_convolution_stacks = 2),
+        20: ChromAlignModel(chromatogram_encoder_neurons = 5, ignorePeakProfile = True),
+        21: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_encoder_neurons = 5),
+        22: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, ignorePeakProfile = True),
+        23: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30),
+        24: ChromAlignModel(chromatogram_encoder_neurons = 5, ignorePeakProfile = True, number_of_left_convolution_stacks = 5),
+        25: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_encoder_neurons = 5, number_of_left_convolution_stacks = 5),
+        26: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, ignorePeakProfile = True, number_of_left_convolution_stacks = 5),
+        27: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, number_of_left_convolution_stacks = 5)
+    }
+    return switcher[variant]

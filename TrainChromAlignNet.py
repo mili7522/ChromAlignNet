@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import importlib
+# import importlib
 import sys
 import os
 import tensorflow as tf
@@ -9,6 +9,7 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
 from utils import loadData, printShapes, getChromatographSegmentDf, generateCombinationIndices
+from model_definition import getModelVariant
 
 
 #%% Options
@@ -18,7 +19,7 @@ validation_split = 0.1
 adamOptimizerOptions = {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999}
 trainWithGPU = True
 
-saveCheckpoints = True  # If checkpoints exist, training will resume from the last checkpoint
+saveCheckpoints = False  # If checkpoints exist, training will resume from the last checkpoint
 saveHistory = True
 modelPath = 'SavedModels'
 modelName = 'ChromAlignNet'
@@ -39,17 +40,17 @@ if len(sys.argv) > 2:
 else:
     repetition = 1
 if len(sys.argv) > 3:
-    model_file = sys.argv[3]
-    if not model_file.startswith('variants.'):
-        model_file = 'variants.' + model_file
-    modelVariant = int(model_file.rsplit('_',1)[1])
+    try:
+        modelVariant = int(sys.argv[3])
+    except:
+        print("Model variant needs to be a number (1 to 27)", file=sys.stderr)
+        raise
 else:
-    model_file = 'model_definition'
     modelVariant = 1
-# Load model definition
-model_file = importlib.import_module(model_file)
-define_model = getattr(model_file, 'define_model')
-ignorePeakProfile = getattr(model_file, 'ignorePeakProfile', False)  # Default is False
+
+ChromAlignModel = getModelVariant(modelVariant)
+define_model = getattr(ChromAlignModel, 'build_model')
+ignorePeakProfile = getattr(ChromAlignModel, 'ignorePeakProfile')
 
 modelName = modelName + '-' + datasetSelection + '-{:02d}'.format(modelVariant) + '-r' + str(repetition).rjust(2, '0')
 
