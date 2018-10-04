@@ -8,35 +8,36 @@ import os
 import tensorflow.keras.backend as K
 from tensorflow.keras.models import load_model
 from utils import loadData, getChromatographSegmentDf, generateCombinationIndices
+from model_definition import getModelVariant
+from parameters import prediction_options
 
 
 ## Changed the normalisation behaviour to fit the training file 2018-04-30-TrainClassifierSiamese-MultiFolderTraining
 ## Provided a maximum cut off time for the peak comparison to limit the number of combinations
 
-#%% Options
+# Load parameters
+ignoreNegatives = prediction_options.get('ignoreNegatives')
+timeCutOff = prediction_options.get('timeCutOff')
 
-ignoreNegatives = False  # Ignore groups assigned with a negative index?
-timeCutOff = 3 # Three minutes
+modelPath = prediction_options.get('modelPath')
+modelFile = prediction_options.get('modelFile')
 
-#%% Load and pre-process data
-modelPath = 'SavedModels/'
-modelFile = 'ChromAlignNet-A-20-r01'
-# modelPath = '../Code/Saved Models/'
-# modelFile = '2018-05-25-Siamese_Net-C-01'
+dataPath = prediction_options.get('dataPath')
+infoFile = prediction_options.get('infoFile')
+sequenceFile = prediction_options.get('sequenceFile')
 
-# TODO - Make this detected automatically from the model or definition file
-ignorePeakProfile = True
 
-# dataPath = 'data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/'
-dataPath = 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/'
+modelVariant = int(modelFile.split('-')[2])
+ChromAlignModel = getModelVariant(modelVariant)
+ignorePeakProfile = getattr(ChromAlignModel, 'ignorePeakProfile')
 
-infoFile = 'PeakData-WithGroup.csv'
+
 if os.path.isfile(os.path.join(dataPath, infoFile)):
     realGroupsAvailable = True
 else:
     infoFile = 'PeakData.csv'
     realGroupsAvailable = False
-sequenceFile = 'WholeSequence.csv'
+
 
 
 ### Load peak and mass slice profiles

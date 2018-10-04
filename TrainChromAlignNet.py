@@ -79,7 +79,6 @@ if trainWithGPU:
     session = tf.Session(config=config)
 
 
-
 ### Execute load for all folders
 dataTime1 = []
 dataTime2 = []

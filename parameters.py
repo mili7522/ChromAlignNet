@@ -32,3 +32,14 @@ training_options = {
     'infoFile': 'PeakData-WithGroup.csv',
     'sequenceFile': 'WholeSequence.csv'
 }
+
+prediction_options = {
+    'ignoreNegatives': False,  # Ignore groups assigned with a negative index?
+    'timeCutOff': 3, # Three minutes
+
+    'modelPath': 'SavedModels/',
+    'modelFile': 'ChromAlignNet-A-20-r01',
+    'dataPath': 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/',
+    'infoFile': 'PeakData-WithGroup.csv',
+    'sequenceFile': 'WholeSequence.csv'
+}
