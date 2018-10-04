@@ -25,46 +25,46 @@ def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'W
         df = pd.read_csv(os.path.join(data_path,file), header = None)
         dfs.append(df)
     peak_df = pd.concat(dfs, axis = 1)
-    
+
     massProfileFiles.sort()
     dfs = []
     for file in massProfileFiles:
         df = pd.read_csv(os.path.join(data_path,file), header = None)
         dfs.append(df)
     mass_profile_df = pd.concat(dfs, axis = 1)
-    
+
     del dfs
     del df
     
     ### Pre-process Data - Normalise peak height and remove abnormal samples
     peak_df = peak_df - np.min(peak_df)
     peak_df.fillna(0, inplace = True)
-    
+
     peak_df_orig = peak_df.copy()
     peak_df_orig = peak_df_orig.transpose()
-    peak_df_orig.reset_index(inplace = True, drop = True)
 
     # Normalise peaks
     peak_df_max = peak_df.max(axis=0)
     peak_df = peak_df.divide(peak_df_max, axis=1)
     peak_df = peak_df.transpose()
-    peak_df.reset_index(inplace = True, drop = True)
-    
-    
+
+
     mass_profile_df = mass_profile_df - np.min(mass_profile_df)
     mass_profile_df.fillna(0, inplace = True)
-    
+
     mass_profile_df_max = mass_profile_df.max(axis=0)
     mass_profile_df = mass_profile_df.divide(mass_profile_df_max, axis=1)
     mass_profile_df = mass_profile_df.transpose()
-    mass_profile_df.reset_index(inplace = True, drop = True)
-    
-    
+
+
     idx = chromatogram_df > 0
     chromatogram_df[idx] = np.log2(chromatogram_df[idx])
     chromatogram_df = chromatogram_df.transpose()
     
-    
+    # Index starts off as all 0s due to concatonation and transposing
+    peak_df.reset_index(inplace = True, drop = True)
+    peak_df_orig.reset_index(inplace = True, drop = True)
+    mass_profile_df.reset_index(inplace = True, drop = True)
     peak_df_max.reset_index(inplace = True, drop = True)
 
     return info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max

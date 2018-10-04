@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+import scipy.spatial
+import scipy.cluster
 import time
 import sys
 import os
@@ -11,9 +11,6 @@ from utils import loadData, getChromatographSegmentDf, generateCombinationIndice
 from model_definition import getModelVariant
 from parameters import prediction_options
 
-
-## Changed the normalisation behaviour to fit the training file 2018-04-30-TrainClassifierSiamese-MultiFolderTraining
-## Provided a maximum cut off time for the peak comparison to limit the number of combinations
 
 # Load parameters
 ignore_negatives = prediction_options.get('ignore_negatives')
@@ -62,9 +59,6 @@ def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_pr
         print("Negative index ignored: {}".format(np.sum(negatives)))
 
     keep_index = (pd.notnull(peak_df).all(1)) & (pd.notnull(mass_profile_df).all(1))
-    #info_df = info_df[keep_index]
-    #peak_df = peak_df[keep_index]
-    #mass_profile_df = mass_profile_df[keep_index]
 
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
     print(np.flatnonzero(keep_index == False))
@@ -139,29 +133,24 @@ def getDistances(prediction):
     distances = 1 / prediction
     return distances
     
-def getDistanceMatrix(comparisons, prediction, clip = 10):
-    
+
+def getDistanceMatrix(comparisons, peaks, prediction, clip = 10):
     distances = getDistances(prediction)
     
-    maxIndex = np.max(comparisons) + 1
-    
-    distance_matrix = np.empty((maxIndex, maxIndex))
+    distance_matrix = np.empty((peaks, peaks))
     distance_matrix.fill(clip)  # Clip value
     
     for i, (x1, x2) in enumerate(comparisons):
         distance_matrix[x1, x2] = min(distances[i], clip)
         distance_matrix[x2, x1] = min(distances[i], clip)
     
-    for i in range(maxIndex):
+    for i in range(peaks):
         distance_matrix[i,i] = 0
     
     return distance_matrix
 
 
 def assignGroups(distance_matrix, threshold = 2):
-    import scipy.spatial
-    import scipy.cluster
-    
     sqform = scipy.spatial.distance.squareform(distance_matrix)
     mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')
 #    plt.figure()
@@ -213,9 +202,12 @@ if __name__ == "__main__":
     prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, info_file, sequence_file)
     prediction = runPrediction(prediction_data, model_path, model_file)
     if predictions_save_name is not None:
-        np.savetxt(predictions_save_name, prediction)
+        predictions_df = pd.DataFrame(np.concatenate((comparisons, prediction), axis = 1), columns = ['x1', 'x2', 'prediction'])
+        predictions_df['x1'] = predictions_df['x1'].astype(int)
+        predictions_df['x2'] = predictions_df['x2'].astype(int)
+        predictions_df.to_csv(predictions_save_name, index = None)
 
-    distance_matrix = getDistanceMatrix(comparisons, prediction, clip = 10)
+    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10)
 
     groups = assignGroups(distance_matrix, threshold = 2)
 
@@ -225,13 +217,12 @@ if __name__ == "__main__":
         alignTimes(real_groups, info_df, 'RealAlignedTime')
         printConfusionMatrix(prediction, info_df, comparisons)
 
+
     plotSpectrumTogether(info_df, peak_df_max, with_real = real_groups_available)
     if not ignore_negatives:
         plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_df_max[info_df['Group'] >= 0], with_real = real_groups_available)
 
-    #plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df[info_df['Group'] >= 0], with_real = real_groups_available)
-    #logPeaks = np.log2(peak_df_orig)
-    #logPeaks[logPeaks < 0] = 0
+
     plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available)
     if not ignore_negatives:
         plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)  # Peaks not normalised

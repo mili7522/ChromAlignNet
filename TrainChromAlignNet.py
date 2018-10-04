@@ -68,6 +68,8 @@ data_paths = list( datasets[i] for i in dataset_for_model[dataset_selection] )
 random_seed = int(ord(dataset_selection) * 1E4 + model_variant * 1E2 + repetition)
 if random_seed_type == 2:
     random_seed = random_seed + int(time.time())
+# if random_seed_type == 3:
+    # Load previous
 with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'a') as f:
     f.write('%d' % random_seed)
 

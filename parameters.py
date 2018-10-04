@@ -5,7 +5,7 @@ training_options = {
     'validation_split': 0.1,
     'adam_optimizer_options': {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999},
     'train_with_gpu': True,
-    'random_seed_type': 1,
+    'random_seed_type': 1,  # Type 1 for repeatability within repetitions, type 2 for random
     
     'save_checkpoints': True,  # If checkpoints exist, training will resume from the last checkpoint
     'save_history': True,
@@ -37,7 +37,7 @@ training_options = {
 prediction_options = {
     'ignore_negatives': False,  # Ignore groups assigned with a negative index?
     'time_cutoff': 3, # Three minutes
-    'predictions_save_name': 'SavedModels/PSave.txt',
+    'predictions_save_name': None,
 
     'model_path': 'SavedModels/',
     'model_file': 'ChromAlignNet-A-20-r01',
@@ -46,3 +46,5 @@ prediction_options = {
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv'
 }
+
+prediction_options['predictions_save_name'] = 'SavedModels/{}_{}_Prediction.csv'.format(prediction_options['model_file'], prediction_options['data_path'].split('-')[4])
