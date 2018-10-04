@@ -106,7 +106,7 @@ class ChromAlignModel:
         chromatogram_encoder = Model(inputs = C_in, outputs = chromatogram_output)
         
         chromatogram_comparison = self.make_siamese_component(chromatogram_encoder, chromatogram_left_input, chromatogram_right_input)
-        chromatogram_prediction = Dense(1, activation = 'sigmoid', name = 'surround_prediction')(chromatogram_comparison)    
+        chromatogram_prediction = Dense(1, activation = 'sigmoid', name = 'chromatogram_prediction')(chromatogram_comparison)    
         
         return chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction
 
@@ -195,4 +195,5 @@ def getModelVariant(variant):
         26: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, ignorePeakProfile = True, number_of_left_convolution_stacks = 5),
         27: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, number_of_left_convolution_stacks = 5)
     }
+    assert variant in switcher, "Model variant does not exist. Check the integer given"
     return switcher[variant]

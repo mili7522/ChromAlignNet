@@ -11,20 +11,25 @@ from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
 from tensorflow.keras.optimizers import Adam
 from utils import loadData, printShapes, getChromatographSegmentDf, generateCombinationIndices
 from model_definition import getModelVariant
+from parameters import training_options
 
+# Load parameters
+epochs = training_options.get('epochs')
+batch_size = training_options.get('batch_size')
+validation_split = training_options.get('validation_split')
+adamOptimizerOptions = training_options.get('adamOptimizerOptions')
+trainWithGPU = training_options.get('trainWithGPU')
+randomSeedType = training_options.get('randomSeedType')
 
-#%% Options
-epochs = 50
-batch_size = 128
-validation_split = 0.1
-adamOptimizerOptions = {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999}
-trainWithGPU = True
-randomSeedType = 1  # Type 1 
+saveCheckpoints = training_options.get('saveCheckpoints')  # If checkpoints exist, training will resume from the last checkpoint
+saveHistory = training_options.get('saveHistory')
+modelPath = training_options.get('modelPath')
+modelName = training_options.get('modelName')
 
-saveCheckpoints = True  # If checkpoints exist, training will resume from the last checkpoint
-saveHistory = True
-modelPath = 'SavedModels'
-modelName = 'ChromAlignNet'
+dataSets = training_options.get('dataSets')
+datasetForModel = training_options.get('datasetForModel')
+infoFile = training_options.get('infoFile')
+sequenceFile = training_options.get('sequenceFile')
 
 
 # Modify the model name for different data sources, model variants and repetitions
@@ -50,6 +55,7 @@ if len(sys.argv) > 3:
 else:
     modelVariant = 1
 
+
 ChromAlignModel = getModelVariant(modelVariant)
 define_model = getattr(ChromAlignModel, 'build_model')
 ignorePeakProfile = getattr(ChromAlignModel, 'ignorePeakProfile')
@@ -58,39 +64,20 @@ modelName = modelName + '-' + datasetSelection + '-{:02d}'.format(modelVariant) 
 
 print("Output model to: ", modelName)
 
+dataPaths = list( dataSets[i] for i in datasetForModel[datasetSelection] )
+
 randomSeed = int(ord(datasetSelection) * 1E4 + modelVariant * 1E2 + repetition)
 if randomSeedType == 2:
     randomSeed = randomSeed + int(time.time())
 with open(os.path.join(modelPath, modelName) + '-RandomSeed.txt', 'w') as f:
   f.write('%d' % randomSeed)
 
+
 if trainWithGPU:
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
 
-#%% Load and pre-process data
-dataSets = [ 'data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/',
-             'data/2018-04-30-ExtractedPeaks-Air115-WithMassSlice/',
-             'data/2018-04-30-ExtractedPeaks-Air143-WithMassSlice/',
-             'data/2018-05-01-ExtractedPeaks-Breath103-WithMassSlice/',
-             'data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/',
-             'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/',
-             'data/2018-05-14-ExtractedPeaks-Breath88-WithMassSlice-All/'
-            ]
-datasetForModel = {
-                    'A': [0, 1, 2], 
-                    'B': [0, 1, 2, 3],
-                    'C': [0, 1, 2, 4],
-                    'D': [0, 1, 2, 3, 4],
-                    'E': [0, 1, 2, 3, 4, 5],
-                    'F': [0, 1, 2, 3, 4, 6]
-                  }
-
-dataPaths = list( dataSets[i] for i in datasetForModel[datasetSelection] )
-
-infoFile = 'PeakData-WithGroup.csv'
-sequenceFile = 'WholeSequence.csv'
 
 
 ### Execute load for all folders
