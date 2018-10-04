@@ -16,28 +16,29 @@ from parameters import training_options
 # Load parameters
 epochs = training_options.get('epochs')
 batch_size = training_options.get('batch_size')
+test_split = training_options.get('test_split')
 validation_split = training_options.get('validation_split')
-adamOptimizerOptions = training_options.get('adamOptimizerOptions')
-trainWithGPU = training_options.get('trainWithGPU')
-randomSeedType = training_options.get('randomSeedType')
+adam_optimizer_options = training_options.get('adam_optimizer_options')
+train_with_gpu = training_options.get('train_with_gpu')
+random_seed_type = training_options.get('random_seed_type')
 
-saveCheckpoints = training_options.get('saveCheckpoints')  # If checkpoints exist, training will resume from the last checkpoint
-saveHistory = training_options.get('saveHistory')
-modelPath = training_options.get('modelPath')
-modelName = training_options.get('modelName')
+save_checkpoints = training_options.get('save_checkpoints')  # If checkpoints exist, training will resume from the last checkpoint
+save_history = training_options.get('save_history')
+model_path = training_options.get('model_path')
+model_name = training_options.get('model_name')
 
-dataSets = training_options.get('dataSets')
-datasetForModel = training_options.get('datasetForModel')
-infoFile = training_options.get('infoFile')
-sequenceFile = training_options.get('sequenceFile')
+datasets = training_options.get('datasets')
+dataset_for_model = training_options.get('dataset_for_model')
+info_file = training_options.get('info_file')
+sequence_file = training_options.get('sequence_file')
 
 
 # Modify the model name for different data sources, model variants and repetitions
 if len(sys.argv) > 1:
     assert sys.argv[1] in ('A', 'B', 'C', 'D', 'E', 'F'), "Dataset selection needs to be a letter between A and F"
-    datasetSelection = sys.argv[1]
+    dataset_selection = sys.argv[1]
 else:
-    datasetSelection = 'A'
+    dataset_selection = 'A'
 if len(sys.argv) > 2:
     try:
         repetition = int(sys.argv[2])
@@ -48,132 +49,132 @@ else:
     repetition = 1
 if len(sys.argv) > 3:
     try:
-        modelVariant = int(sys.argv[3])
+        model_variant = int(sys.argv[3])
     except:
         print("Model variant needs to be a number (1 to 27)", file=sys.stderr)
         raise
 else:
-    modelVariant = 1
+    model_variant = 1
 
 
-ChromAlignModel = getModelVariant(modelVariant)
-define_model = getattr(ChromAlignModel, 'build_model')
-ignorePeakProfile = getattr(ChromAlignModel, 'ignorePeakProfile')
+chrom_align_model = getModelVariant(model_variant)
+buildModel = getattr(chrom_align_model, 'buildModel')
+ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile')
 
-modelName = modelName + '-' + datasetSelection + '-{:02d}'.format(modelVariant) + '-r' + str(repetition).rjust(2, '0')
+model_name = model_name + '-' + dataset_selection + '-{:02d}'.format(model_variant) + '-r' + str(repetition).rjust(2, '0')
 
-print("Output model to: ", modelName)
+print("Output model to: ", model_name)
 
-dataPaths = list( dataSets[i] for i in datasetForModel[datasetSelection] )
+data_paths = list( datasets[i] for i in dataset_for_model[dataset_selection] )
 
-randomSeed = int(ord(datasetSelection) * 1E4 + modelVariant * 1E2 + repetition)
-if randomSeedType == 2:
-    randomSeed = randomSeed + int(time.time())
-with open(os.path.join(modelPath, modelName) + '-RandomSeed.txt', 'w') as f:
-  f.write('%d' % randomSeed)
+random_seed = int(ord(dataset_selection) * 1E4 + model_variant * 1E2 + repetition)
+if random_seed_type == 2:
+    random_seed = random_seed + int(time.time())
+with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'w') as f:
+  f.write('%d' % random_seed)
 
 
-if trainWithGPU:
+if train_with_gpu:
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)
 
 
 ### Execute load for all folders
-dataTime1 = []
-dataTime2 = []
-if not ignorePeakProfile:
-    dataPeakProfile1 = []
-    dataPeakProfile2 = []
-dataMassProfile1 = []
-dataMassProfile2 = []
-sequenceProfile1 = []
-sequenceProfile2 = []
-dataY = []
+data_time_1 = []
+data_time_2 = []
+if not ignore_peak_profile:
+    data_peak_1 = []
+    data_peak_2 = []
+data_mass_spectrum_1 = []
+data_mass_spectrum_2 = []
+data_chrom_seg_1 = []
+data_chrom_seg_2 = []
+data_y = []
 
 
-for dataPath in dataPaths:
-    print('Loading:', dataPath)
-    infoDf, peakDf, massProfileDf, sequenceDf, _, _ = loadData(dataPath, infoFile, sequenceFile)
+for data_path in data_paths:
+    print('Loading:', data_path)
+    info_df, peak_df, mass_profile_df, chromatogram_df, _, _ = loadData(data_path, info_file, sequence_file)
 
     # Remove null rows and negative indexed groups
-    keepIndex = (pd.notnull(massProfileDf).all(1)) & (infoDf['Group'] >= 0)
-    if not ignorePeakProfile:
-        keepIndex = keepIndex & (pd.notnull(peakDf).all(1))
-    infoDf = infoDf[keepIndex]
-    peakDf = peakDf[keepIndex]
-    massProfileDf = massProfileDf[keepIndex]
-    surroundsDf = getChromatographSegmentDf(infoDf, sequenceDf, sequence_length = 600)
-    print("Dropped rows: {}".format(np.sum(keepIndex == False)))
+    keep_index = (pd.notnull(mass_profile_df).all(1)) & (info_df['Group'] >= 0)
+    if not ignore_peak_profile:
+        keep_index = keep_index & (pd.notnull(peak_df).all(1))
+    info_df = info_df[keep_index]
+    peak_df = peak_df[keep_index]
+    mass_profile_df = mass_profile_df[keep_index]
+    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, sequence_length = 600)
+    print("Dropped rows: {}".format(np.sum(keep_index == False)))
 
-    a = len(dataY)
-    x1, x2, y = generateCombinationIndices(infoDf, timeCutOff = None, returnY = True, shuffle = False, setRandomSeed = randomSeed)
-    dataTime1.extend(infoDf.loc[x1]['peakMaxTime'])
-    dataTime2.extend(infoDf.loc[x2]['peakMaxTime'])
-    if not ignorePeakProfile:
-        dataPeakProfile1.append(peakDf.loc[x1])
-        dataPeakProfile2.append(peakDf.loc[x2])
-    dataMassProfile1.append(massProfileDf.loc[x1])
-    dataMassProfile2.append(massProfileDf.loc[x2])
-    sequenceProfile1.append(surroundsDf.loc[x1])
-    sequenceProfile2.append(surroundsDf.loc[x2])
-    dataY.extend(y)
-    print(len(dataY) - a, 'combinations generated')
+    a = len(data_y)
+    x1, x2, y = generateCombinationIndices(info_df, time_cutoff = None, return_y = True, random_seed = random_seed)
+    data_time_1.extend(info_df.loc[x1]['peakMaxTime'])
+    data_time_2.extend(info_df.loc[x2]['peakMaxTime'])
+    if not ignore_peak_profile:
+        data_peak_1.append(peak_df.loc[x1])
+        data_peak_2.append(peak_df.loc[x2])
+    data_mass_spectrum_1.append(mass_profile_df.loc[x1])
+    data_mass_spectrum_2.append(mass_profile_df.loc[x2])
+    data_chrom_seg_1.append(chrom_seg_df.loc[x1])
+    data_chrom_seg_2.append(chrom_seg_df.loc[x2])
+    data_y.extend(y)
+    print(len(data_y) - a, 'combinations generated')
     
 ### Shuffle data
-np.random.seed(randomSeed)
-shuffleIndex = np.random.permutation(len(dataTime1))
-dataTime1 = np.array(dataTime1)[shuffleIndex]
-dataTime2 = np.array(dataTime2)[shuffleIndex]
-if not ignorePeakProfile:
-    dataPeakProfile1 = pd.concat(dataPeakProfile1, axis = 0)  # Use pd to concat since the DataSeries might be of different lengths
-    dataPeakProfile1.fillna(0, inplace = True)
-    dataPeakProfile1 = dataPeakProfile1.values[shuffleIndex]
-    dataPeakProfile2 = pd.concat(dataPeakProfile2, axis = 0)
-    dataPeakProfile2.fillna(0, inplace = True)
-    dataPeakProfile2 = dataPeakProfile2.values[shuffleIndex]
-dataMassProfile1 = np.array(pd.concat(dataMassProfile1))[shuffleIndex]
-dataMassProfile2 = np.array(pd.concat(dataMassProfile2))[shuffleIndex]
-sequenceProfile1 = np.array(pd.concat(sequenceProfile1))[shuffleIndex]
-sequenceProfile2 = np.array(pd.concat(sequenceProfile2))[shuffleIndex]
-dataY = np.array(dataY)[shuffleIndex]
+np.random.seed(random_seed)
+shuffle_index = np.random.permutation(len(data_time_1))
+data_time_1 = np.array(data_time_1)[shuffle_index]
+data_time_2 = np.array(data_time_2)[shuffle_index]
+if not ignore_peak_profile:
+    data_peak_1 = pd.concat(data_peak_1, axis = 0)  # Use pd to concat since the DataSeries might be of different lengths
+    data_peak_1.fillna(0, inplace = True)
+    data_peak_1 = data_peak_1.values[shuffle_index]
+    data_peak_2 = pd.concat(data_peak_2, axis = 0)
+    data_peak_2.fillna(0, inplace = True)
+    data_peak_2 = data_peak_2.values[shuffle_index]
+data_mass_spectrum_1 = np.array(pd.concat(data_mass_spectrum_1))[shuffle_index]
+data_mass_spectrum_2 = np.array(pd.concat(data_mass_spectrum_2))[shuffle_index]
+data_chrom_seg_1 = np.array(pd.concat(data_chrom_seg_1))[shuffle_index]
+data_chrom_seg_2 = np.array(pd.concat(data_chrom_seg_2))[shuffle_index]
+data_y = np.array(data_y)[shuffle_index]
 
 
 ### Split into training and test sets
-training = len(dataTime1) // 5 * 4  # 80% training set, 20% testing set
+training = int(len(data_time_1) * (1-test_split))
 
-trainingTime1 = dataTime1[:training]
-trainingTime2 = dataTime2[:training]
-if not ignorePeakProfile:
-    trainingPeakProfile1 = dataPeakProfile1[:training]
-    trainingPeakProfile2 = dataPeakProfile2[:training]
-trainingMassProfile1 = dataMassProfile1[:training]
-trainingMassProfile2 = dataMassProfile2[:training]
-trainingSequenceProfile1 = sequenceProfile1[:training]
-trainingSequenceProfile2 = sequenceProfile2[:training]
-trainingY = dataY[:training]
+train_time_1 = data_time_1[:training]
+train_time_2 = data_time_2[:training]
+if not ignore_peak_profile:
+    train_peak_1 = data_peak_1[:training]
+    train_peak_2 = data_peak_2[:training]
+train_mass_spectrum_1 = data_mass_spectrum_1[:training]
+train_mass_spectrum_2 = data_mass_spectrum_2[:training]
+train_chrom_seg_1 = data_chrom_seg_1[:training]
+train_chrom_seg_2 = data_chrom_seg_2[:training]
+train_y = data_y[:training]
 
-testingTime1 = dataTime1[training:]
-testingTime2 = dataTime2[training:]
-if not ignorePeakProfile:
-    testingPeakProfile1 = dataPeakProfile1[training:]
-    testingPeakProfile2 = dataPeakProfile2[training:]
-testingMassProfile1 = dataMassProfile1[training:]
-testingMassProfile2 = dataMassProfile2[training:]
-testingSequenceProfile1 = sequenceProfile1[training:]
-testingSequenceProfile2 = sequenceProfile2[training:]
-testingY = dataY[training:]
+test_time_1 = data_time_1[training:]
+test_time_2 = data_time_2[training:]
+if not ignore_peak_profile:
+    test_peak_1 = data_peak_1[training:]
+    test_peak_2 = data_peak_2[training:]
+test_mass_spectrum_1 = data_mass_spectrum_1[training:]
+test_mass_spectrum_2 = data_mass_spectrum_2[training:]
+test_chrom_seg_1 = data_chrom_seg_1[training:]
+test_chrom_seg_2 = data_chrom_seg_2[training:]
+test_y = data_y[training:]
 
-if not ignorePeakProfile:
-    samples, max_peak_seq_length = dataPeakProfile1.shape
-samples, sequence_length = sequenceProfile1.shape
-testing_samples, max_mass_seq_length = testingMassProfile1.shape
+if not ignore_peak_profile:
+    samples, max_peak_seq_length = data_peak_1.shape
+samples, sequence_length = data_chrom_seg_1.shape
+testing_samples, max_mass_seq_length = test_mass_spectrum_1.shape
 training_samples = training
 
 print('Number of samples:', samples)
 print('Number of training samples:', training_samples)
 print('Number of testing samples:', testing_samples)
-if not ignorePeakProfile:
+if not ignore_peak_profile:
     print('Max peak length:', max_peak_seq_length)
 print('Sequence length:', sequence_length)
 print('Max mass sequence length:', max_mass_seq_length)
@@ -181,61 +182,58 @@ print('Max mass sequence length:', max_mass_seq_length)
 
 
 # Check if existing checkpoints are present - if so then load and resume training from last epoch
-checkpointPath = os.path.join(modelPath, modelName + '-Checkpoint')
-if os.path.isdir(checkpointPath) and os.listdir(checkpointPath):
+checkpoint_path = os.path.join(model_path, model_name + '-Checkpoint')
+if os.path.isdir(checkpoint_path) and os.listdir(checkpoint_path):
     files = []
-    for f in os.listdir(checkpointPath):
+    for f in os.listdir(checkpoint_path):
         if f.endswith('.h5'):
-            files.append(os.path.join(checkpointPath, f))
+            files.append(os.path.join(checkpoint_path, f))
     last_checkpoint = sorted(files)[-1]
     model = load_model(last_checkpoint)
     initial_epoch = int(last_checkpoint[-6:-3])
 else:
-    model = define_model(max_mass_seq_length, sequence_length)
+    model = buildModel(max_mass_seq_length, sequence_length)
     initial_epoch = 0
 
 
-loss_weights = [1., 0.2, 0.2, 0.2]
-if ignorePeakProfile:
-    loss_weights = loss_weights[:-1]
 
-model.compile(optimizer = Adam(**adamOptimizerOptions),
+model.compile(optimizer = Adam(**adam_optimizer_options),
               loss = 'binary_crossentropy',
               metrics = ['accuracy'],
-              loss_weights = loss_weights)
+              loss_weights = [1] + [0.2] * (2 if ignore_peak_profile else 3))
 
 #%% Train model
-if os.path.isdir(modelPath) == False:
-    os.makedirs(modelPath)
+if os.path.isdir(model_path) == False:
+    os.makedirs(model_path)
 
-if saveHistory:
-    logger = CSVLogger(os.path.join(modelPath, modelName) + '-History.csv', separator = ',', append = True)
+if save_history:
+    logger = CSVLogger(os.path.join(model_path, model_name) + '-History.csv', separator = ',', append = True)
 else:
     logger = None
-if saveCheckpoints:
-    if os.path.isdir(os.path.join(modelPath, modelName + '-Checkpoint')) == False:
-        os.makedirs(os.path.join(modelPath, modelName + '-Checkpoint'))
-    checkpoint = ModelCheckpoint(os.path.join(modelPath, modelName + '-Checkpoint', modelName) + '-Checkpoint-{epoch:03d}.h5')
+if save_checkpoints:
+    if os.path.isdir(os.path.join(model_path, model_name + '-Checkpoint')) == False:
+        os.makedirs(os.path.join(model_path, model_name + '-Checkpoint'))
+    checkpoint = ModelCheckpoint(os.path.join(model_path, model_name + '-Checkpoint', model_name) + '-Checkpoint-{epoch:03d}.h5')
     
     callbacks = [checkpoint] + ([logger] if logger is not None else [])
 else:
     callbacks = [logger] if logger is not None else None
 
-if ignorePeakProfile:
-    training_data = [trainingMassProfile1, trainingMassProfile2,
-                    trainingSequenceProfile1.reshape((training_samples, sequence_length, 1)),
-                    trainingSequenceProfile2.reshape((training_samples, sequence_length, 1)),
-                    np.abs(trainingTime2 - trainingTime1)]
+if ignore_peak_profile:
+    training_data = [train_mass_spectrum_1, train_mass_spectrum_2,
+                    train_chrom_seg_1.reshape((training_samples, sequence_length, 1)),
+                    train_chrom_seg_2.reshape((training_samples, sequence_length, 1)),
+                    np.abs(train_time_2 - train_time_1)]
 else:
-    training_data = [trainingMassProfile1, trainingMassProfile2,
-                    trainingPeakProfile1.reshape((training_samples, max_peak_seq_length, 1)),
-                    trainingPeakProfile2.reshape((training_samples, max_peak_seq_length, 1)),
-                    trainingSequenceProfile1.reshape((training_samples, sequence_length, 1)),
-                    trainingSequenceProfile2.reshape((training_samples, sequence_length, 1)),
-                    np.abs(trainingTime2 - trainingTime1)]
+    training_data = [train_mass_spectrum_1, train_mass_spectrum_2,
+                    train_peak_1.reshape((training_samples, max_peak_seq_length, 1)),
+                    train_peak_2.reshape((training_samples, max_peak_seq_length, 1)),
+                    train_chrom_seg_1.reshape((training_samples, sequence_length, 1)),
+                    train_chrom_seg_2.reshape((training_samples, sequence_length, 1)),
+                    np.abs(train_time_2 - train_time_1)]
 
 history = model.fit(training_data,
-                    [trainingY] * (3 if ignorePeakProfile else 4),
+                    [train_y] * (3 if ignore_peak_profile else 4),
                     epochs = epochs,
                     batch_size = batch_size,
                     validation_split = validation_split,
@@ -243,32 +241,32 @@ history = model.fit(training_data,
                     callbacks = callbacks)
 
 
-model.save(os.path.join(modelPath, modelName) + '.h5')
+model.save(os.path.join(model_path, model_name) + '.h5')
 
 
-if ignorePeakProfile:
-    prediction_data = [testingMassProfile1, testingMassProfile2,
-                        testingSequenceProfile1.reshape((testing_samples, sequence_length, 1)),
-                        testingSequenceProfile2.reshape((testing_samples, sequence_length, 1)),
-                        np.abs(testingTime2 - testingTime1)]
+if ignore_peak_profile:
+    prediction_data = [test_mass_spectrum_1, test_mass_spectrum_2,
+                        test_chrom_seg_1.reshape((testing_samples, sequence_length, 1)),
+                        test_chrom_seg_2.reshape((testing_samples, sequence_length, 1)),
+                        np.abs(test_time_2 - test_time_1)]
 else:
-    prediction_data = [testingMassProfile1, testingMassProfile2,
-                        testingPeakProfile1.reshape((testing_samples, max_peak_seq_length, 1)),
-                        testingPeakProfile2.reshape((testing_samples, max_peak_seq_length, 1)),
-                        testingSequenceProfile1.reshape((testing_samples, sequence_length, 1)),
-                        testingSequenceProfile2.reshape((testing_samples, sequence_length, 1)),
-                        np.abs(testingTime2 - testingTime1)]
+    prediction_data = [test_mass_spectrum_1, test_mass_spectrum_2,
+                        test_peak_1.reshape((testing_samples, max_peak_seq_length, 1)),
+                        test_peak_2.reshape((testing_samples, max_peak_seq_length, 1)),
+                        test_chrom_seg_1.reshape((testing_samples, sequence_length, 1)),
+                        test_chrom_seg_2.reshape((testing_samples, sequence_length, 1)),
+                        np.abs(test_time_2 - test_time_1)]
 
 ### Predict on test set
 prediction = model.predict(prediction_data)
 
 prediction = prediction[0]  # Only take the main outcome
 
-wrong = abs(np.round(prediction).ravel() - testingY)
+wrong = abs(np.round(prediction).ravel() - test_y)
 wrongIndex = np.nonzero(wrong)[0]
 print('Number wrong:', np.sum(wrong))
 # Print some examples of wrong predictions
 for i in range(len(wrongIndex)):
     if i > 30: break
-    print('Prediction:', prediction[wrongIndex[i]], 'Actual:', testingY[wrongIndex[i]])
+    print('Prediction:', prediction[wrongIndex[i]], 'Actual:', test_y[wrongIndex[i]])
 

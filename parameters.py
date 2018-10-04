@@ -1,18 +1,19 @@
 training_options = {
     'epochs': 50,
     'batch_size': 128,
+    'test_split': 0.2,
     'validation_split': 0.1,
-    'adamOptimizerOptions': {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999},
-    'trainWithGPU': True,
-    'randomSeedType': 1,
+    'adam_optimizer_options': {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999},
+    'train_with_gpu': True,
+    'random_seed_type': 1,
     
-    'saveCheckpoints': True,  # If checkpoints exist, training will resume from the last checkpoint
-    'saveHistory': True,
-    'modelPath': 'SavedModels',
-    'modelName': 'ChromAlignNet',
+    'save_checkpoints': True,  # If checkpoints exist, training will resume from the last checkpoint
+    'save_history': True,
+    'model_path': 'SavedModels',
+    'model_name': 'ChromAlignNet',
 
 
-    'dataSets': [ 'data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/',
+    'datasets': [ 'data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/',
                   'data/2018-04-30-ExtractedPeaks-Air115-WithMassSlice/',
                   'data/2018-04-30-ExtractedPeaks-Air143-WithMassSlice/',
                   'data/2018-05-01-ExtractedPeaks-Breath103-WithMassSlice/',
@@ -20,7 +21,7 @@ training_options = {
                   'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/',
                   'data/2018-05-14-ExtractedPeaks-Breath88-WithMassSlice-All/'
                 ],
-    'datasetForModel': {
+    'dataset_for_model': {
                          'A': [0, 1, 2], 
                          'B': [0, 1, 2, 3],
                          'C': [0, 1, 2, 4],
@@ -29,17 +30,17 @@ training_options = {
                          'F': [0, 1, 2, 3, 4, 6]
                          },
 
-    'infoFile': 'PeakData-WithGroup.csv',
-    'sequenceFile': 'WholeSequence.csv'
+    'info_file': 'PeakData-WithGroup.csv',
+    'sequence_file': 'WholeSequence.csv'
 }
 
 prediction_options = {
-    'ignoreNegatives': False,  # Ignore groups assigned with a negative index?
-    'timeCutOff': 3, # Three minutes
+    'ignore_negatives': False,  # Ignore groups assigned with a negative index?
+    'time_cutoff': 3, # Three minutes
 
-    'modelPath': 'SavedModels/',
-    'modelFile': 'ChromAlignNet-A-20-r01',
-    'dataPath': 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/',
-    'infoFile': 'PeakData-WithGroup.csv',
-    'sequenceFile': 'WholeSequence.csv'
+    'model_path': 'SavedModels/',
+    'model_file': 'ChromAlignNet-A-20-r01',
+    'data_path': 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/',
+    'info_file': 'PeakData-WithGroup.csv',
+    'sequence_file': 'WholeSequence.csv'
 }

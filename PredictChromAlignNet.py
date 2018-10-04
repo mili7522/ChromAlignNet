@@ -16,78 +16,78 @@ from parameters import prediction_options
 ## Provided a maximum cut off time for the peak comparison to limit the number of combinations
 
 # Load parameters
-ignoreNegatives = prediction_options.get('ignoreNegatives')
-timeCutOff = prediction_options.get('timeCutOff')
+ignore_negatives = prediction_options.get('ignore_negatives')
+time_cutoff = prediction_options.get('time_cutoff')
 
-modelPath = prediction_options.get('modelPath')
-modelFile = prediction_options.get('modelFile')
+model_path = prediction_options.get('model_path')
+model_file = prediction_options.get('model_file')
 
-dataPath = prediction_options.get('dataPath')
-infoFile = prediction_options.get('infoFile')
-sequenceFile = prediction_options.get('sequenceFile')
-
-
-
-modelVariant = int(modelFile.split('-')[2])
-ChromAlignModel = getModelVariant(modelVariant)
-ignorePeakProfile = getattr(ChromAlignModel, 'ignorePeakProfile')
+data_path = prediction_options.get('data_path')
+info_file = prediction_options.get('info_file')
+sequence_file = prediction_options.get('sequence_file')
 
 
-if os.path.isfile(os.path.join(dataPath, infoFile)):
-    realGroupsAvailable = True
+
+model_variant = int(model_file.split('-')[2])
+chrom_align_model = getModelVariant(model_variant)
+ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile')
+
+
+if os.path.isfile(os.path.join(data_path, info_file)):
+    real_groups_available = True
 else:
-    infoFile = 'PeakData.csv'
-    realGroupsAvailable = False
+    info_file = 'PeakData.csv'
+    real_groups_available = False
 
 
 ### Load peak and mass slice profiles
-def prepareDataForPrediction(dataPath, infoFile, sequenceFile, ignorePeakProfile = ignorePeakProfile):
+def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_profile = ignore_peak_profile):
     loadTime = time.time()
 
-    infoDf, peakDf, massProfileDf, sequenceDf, peakDfOrig, peakDfMax = loadData(dataPath, infoFile, sequenceFile)
+    info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max = loadData(data_path, info_file, sequence_file)
 
-    if ignoreNegatives and realGroupsAvailable:
-        negatives = infoDf['Group'] < 0
-        infoDf = infoDf[~negatives]
-        peakDf = peakDf[~negatives]
-        peakDfOrig = peakDfOrig[~negatives]
-        peakDfMax = peakDfMax[~negatives]
-        massProfileDf = massProfileDf[~negatives]
-        infoDf.reset_index(inplace = True, drop = False)
-        peakDf.reset_index(inplace = True, drop = True)
-        peakDfOrig.reset_index(inplace = True, drop = True)
-        peakDfMax.reset_index(inplace = True, drop = True)
-        massProfileDf.reset_index(inplace = True, drop = True)
+    if ignore_negatives and real_groups_available:
+        negatives = info_df['Group'] < 0
+        info_df = info_df[~negatives]
+        peak_df = peak_df[~negatives]
+        peak_df_orig = peak_df_orig[~negatives]
+        peak_df_max = peak_df_max[~negatives]
+        mass_profile_df = mass_profile_df[~negatives]
+        info_df.reset_index(inplace = True, drop = False)
+        peak_df.reset_index(inplace = True, drop = True)
+        peak_df_orig.reset_index(inplace = True, drop = True)
+        peak_df_max.reset_index(inplace = True, drop = True)
+        mass_profile_df.reset_index(inplace = True, drop = True)
         print("Negative index ignored: {}".format(np.sum(negatives)))
 
-    keepIndex = (pd.notnull(peakDf).all(1)) & (pd.notnull(massProfileDf).all(1))
-    #infoDf = infoDf[keepIndex]
-    #peakDf = peakDf[keepIndex]
-    #massProfileDf = massProfileDf[keepIndex]
+    keep_index = (pd.notnull(peak_df).all(1)) & (pd.notnull(mass_profile_df).all(1))
+    #info_df = info_df[keep_index]
+    #peak_df = peak_df[keep_index]
+    #mass_profile_df = mass_profile_df[keep_index]
 
-    print("Dropped rows: {}".format(np.sum(keepIndex == False)))
-    print(np.flatnonzero(keepIndex == False))
+    print("Dropped rows: {}".format(np.sum(keep_index == False)))
+    print(np.flatnonzero(keep_index == False))
 
-    surroundsDf = getChromatographSegmentDf(infoDf, sequenceDf, sequence_length = 600)
+    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, sequence_length = 600)
 
     #%% Generate data combinations
-    comparisons = generateCombinationIndices(infoDf[keepIndex], timeCutOff = timeCutOff, returnY = False)
+    comparisons = generateCombinationIndices(info_df[keep_index], time_cutoff = time_cutoff, return_y = False)
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
 
-    x1Time = infoDf.loc[x1]['peakMaxTime'].values
-    x2Time = infoDf.loc[x2]['peakMaxTime'].values
-    dataTimeDiff = abs(x1Time - x2Time)
-    dataPeakProfile1 = peakDf.loc[x1].values
-    dataPeakProfile2 = peakDf.loc[x2].values
-    dataMassProfile1 = massProfileDf.loc[x1].values
-    dataMassProfile2 = massProfileDf.loc[x2].values
-    sequenceProfile1 = surroundsDf.loc[x1].values
-    sequenceProfile2 = surroundsDf.loc[x2].values
+    data_time_1 = info_df.loc[x1]['peakMaxTime'].values
+    data_time_2 = info_df.loc[x2]['peakMaxTime'].values
+    data_time_diff = abs(data_time_1 - data_time_2)
+    data_peak_1 = peak_df.loc[x1].values
+    data_peak_2 = peak_df.loc[x2].values
+    data_mass_spectrum_1 = mass_profile_df.loc[x1].values
+    data_mass_spectrum_2 = mass_profile_df.loc[x2].values
+    data_chrom_seg_1 = chrom_seg_df.loc[x1].values
+    data_chrom_seg_1 = chrom_seg_df.loc[x2].values
 
-    samples, max_peak_seq_length = dataPeakProfile1.shape
-    _, max_mass_seq_length = dataMassProfile1.shape
-    _, sequence_length = sequenceProfile1.shape
+    samples, max_peak_seq_length = data_peak_1.shape
+    _, max_mass_seq_length = data_mass_spectrum_1.shape
+    _, sequence_length = data_chrom_seg_1.shape
 
     print('Number of samples:', samples)
     print('Max peak sequence length:', max_peak_seq_length)
@@ -100,37 +100,36 @@ def prepareDataForPrediction(dataPath, infoFile, sequenceFile, ignorePeakProfile
     sys.stdout.flush()   # XRW
 
 
-    if ignorePeakProfile:
-        prediction_data = [dataMassProfile1, dataMassProfile2,
-                            sequenceProfile1.reshape((samples, sequence_length, 1)),
-                            sequenceProfile2.reshape((samples, sequence_length, 1)),
-                            dataTimeDiff]
+    if ignore_peak_profile:
+        prediction_data = [data_mass_spectrum_1, data_mass_spectrum_2,
+                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
+                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
+                            data_time_diff]
     else:
-        prediction_data = [dataMassProfile1, dataMassProfile2,
-                            dataPeakProfile1.reshape((samples, max_peak_seq_length, 1)),
-                            dataPeakProfile2.reshape((samples, max_peak_seq_length, 1)),
-                            sequenceProfile1.reshape((samples, sequence_length, 1)),
-                            sequenceProfile2.reshape((samples, sequence_length, 1)),
-                            dataTimeDiff]
+        prediction_data = [data_mass_spectrum_1, data_mass_spectrum_2,
+                            data_peak_1.reshape((samples, max_peak_seq_length, 1)),
+                            data_peak_2.reshape((samples, max_peak_seq_length, 1)),
+                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
+                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
+                            data_time_diff]
 
-    return prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig
+    return prediction_data, comparisons, info_df, peak_df_orig, peak_df_max
 
-def runPrediction(prediction_data, modelPath, modelFile):
+def runPrediction(prediction_data, model_path, model_file):
     #%% Predict
     K.clear_session()
-    predictTime = time.time()
+    predict_time = time.time()
     ### Load model
-    loading = os.path.join(modelPath, modelFile) + '.h5'
+    loading = os.path.join(model_path, model_file) + '.h5'
     print(loading)
     model = load_model(loading)
 
-    prediction = model.predict(prediction_data,
-                                verbose = 1)
-    predAll = prediction
+    prediction = model.predict(prediction_data, verbose = 1)
+
     prediction = prediction[0]  # Only take the main outcome
 
-    #print('Time to predict:', round((time.time() - predictTime)/60, 2), 'min')
-    print('Time to predict:', time.time() - predictTime, 'sec')
+    #print('Time to predict:', round((time.time() - predict_time)/60, 2), 'min')
+    print('Time to predict:', time.time() - predict_time, 'sec')
     return prediction
 
 
@@ -145,28 +144,28 @@ def getDistanceMatrix(comparisons, prediction, clip = 10):
     
     maxIndex = np.max(comparisons) + 1
     
-    distanceMatrix = np.empty((maxIndex, maxIndex))
-    distanceMatrix.fill(clip)  # Clip value
+    distance_matrix = np.empty((maxIndex, maxIndex))
+    distance_matrix.fill(clip)  # Clip value
     
     for i, (x1, x2) in enumerate(comparisons):
-        distanceMatrix[x1, x2] = min(distances[i], clip)
-        distanceMatrix[x2, x1] = min(distances[i], clip)
+        distance_matrix[x1, x2] = min(distances[i], clip)
+        distance_matrix[x2, x1] = min(distances[i], clip)
     
     for i in range(maxIndex):
-        distanceMatrix[i,i] = 0
+        distance_matrix[i,i] = 0
     
-    return distanceMatrix
+    return distance_matrix
 
 
-def assignGroups(distanceMatrix, threshold = 2):
+def assignGroups(distance_matrix, threshold = 2):
     import scipy.spatial
     import scipy.cluster
     
-    sqform = scipy.spatial.distance.squareform(distanceMatrix)
+    sqform = scipy.spatial.distance.squareform(distance_matrix)
     mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')
 #    plt.figure()
 #    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3)
-#    plt.savefig(dataPath + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')
+#    plt.savefig(data_path + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')
     labels = scipy.cluster.hierarchy.fcluster(mergings, threshold, criterion = 'distance')
     
     groups = {}
@@ -176,20 +175,20 @@ def assignGroups(distanceMatrix, threshold = 2):
     return groups
 
 
-def alignTimes(groups, infoDf, alignTo):
-    infoDf[alignTo] = infoDf['peakMaxTime']
+def alignTimes(groups, info_df, align_to):
+    info_df[align_to] = info_df['peakMaxTime']
     for group in groups.values():
-        times = infoDf.loc[group, 'peakMaxTime']
-        averageTime = np.mean(times)
-        infoDf.loc[group, alignTo] = averageTime
+        times = info_df.loc[group, 'peakMaxTime']
+        average_time = np.mean(times)
+        info_df.loc[group, align_to] = average_time
     
 
-def printConfusionMatrix(prediction, infoDf, comparisons):
+def printConfusionMatrix(prediction, info_df, comparisons):
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
     p = np.round(prediction).astype(int).reshape((-1))
-    g1 = infoDf.loc[x1]['Group'].values
-    g2 = infoDf.loc[x2]['Group'].values
+    g1 = info_df.loc[x1]['Group'].values
+    g2 = info_df.loc[x2]['Group'].values
 
     keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
     truth = (g1 == g2)
@@ -210,28 +209,26 @@ def printConfusionMatrix(prediction, infoDf, comparisons):
 ####
 
 if __name__ == "__main__":
-    prediction_data, comparisons, infoDf, peakDfMax, peakDfOrig = prepareDataForPrediction(dataPath, infoFile, sequenceFile)
-    prediction = runPrediction(prediction_data, modelPath, modelFile)
+    prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, info_file, sequence_file)
+    prediction = runPrediction(prediction_data, model_path, model_file)
 
-    distanceMatrix = getDistanceMatrix(comparisons, prediction, clip = 10)
+    distance_matrix = getDistanceMatrix(comparisons, prediction, clip = 10)
 
-    groups = assignGroups(distanceMatrix, threshold = 2)
+    groups = assignGroups(distance_matrix, threshold = 2)
 
-    alignTimes(groups, infoDf, 'AlignedTime')
-    if realGroupsAvailable:
-        realGroups = getRealGroupAssignments(infoDf)
-        alignTimes(realGroups, infoDf, 'RealAlignedTime')
-        # print("Group Overlap:", round(groupOverlap(groups, realGroups),4))
-        print('---')
-        printConfusionMatrix(prediction, infoDf, comparisons)
+    alignTimes(groups, info_df, 'AlignedTime')
+    if real_groups_available:
+        real_groups = getRealGroupAssignments(info_df)
+        alignTimes(real_groups, info_df, 'RealAlignedTime')
+        printConfusionMatrix(prediction, info_df, comparisons)
 
-    plotSpectrumTogether(infoDf, peakDfMax, withReal = realGroupsAvailable)
-    if not ignoreNegatives:
-        plotSpectrumTogether(infoDf[infoDf['Group'] >= 0], peakDfMax[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
+    plotSpectrumTogether(info_df, peak_df_max, with_real = real_groups_available)
+    if not ignore_negatives:
+        plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_df_max[info_df['Group'] >= 0], with_real = real_groups_available)
 
-    #plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDf[infoDf['Group'] >= 0], withReal = realGroupsAvailable)
-    #logPeaks = np.log2(peakDfOrig)
+    #plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df[info_df['Group'] >= 0], with_real = real_groups_available)
+    #logPeaks = np.log2(peak_df_orig)
     #logPeaks[logPeaks < 0] = 0
-    plotPeaksTogether(infoDf, peakDfOrig, withReal = realGroupsAvailable)
-    if not ignoreNegatives:
-        plotPeaksTogether(infoDf[infoDf['Group'] >= 0], peakDfOrig[infoDf['Group'] >= 0], withReal = realGroupsAvailable)  # Peaks not normalised
+    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available)
+    if not ignore_negatives:
+        plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)  # Peaks not normalised

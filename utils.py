@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 import itertools
 import os
 
-def loadData(dataPath, infoFile = 'PeakData-WithGroup.csv', sequenceFile = 'WholeSequence.csv'):
+def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'WholeSequence.csv'):
 
-    infoDf = pd.read_csv(os.path.join(dataPath, infoFile), index_col = 0)
-    sequenceDf = pd.read_csv(os.path.join(dataPath, sequenceFile), index_col = 0)
+    info_df = pd.read_csv(os.path.join(data_path, info_file), index_col = 0)
+    chromatogram_df = pd.read_csv(os.path.join(data_path, sequence_file), index_col = 0)
     
     ### Load peak and mass slice profiles
     peakFiles = []
     massProfileFiles = []
-    for f in os.listdir(dataPath):
+    for f in os.listdir(data_path):
         if f.endswith('.txt'):
             peakFiles.append(f)
             
@@ -22,137 +22,136 @@ def loadData(dataPath, infoFile = 'PeakData-WithGroup.csv', sequenceFile = 'Whol
     peakFiles.sort()
     dfs = []
     for file in peakFiles:
-        df = pd.read_csv(os.path.join(dataPath,file), header = None)
+        df = pd.read_csv(os.path.join(data_path,file), header = None)
         dfs.append(df)
-    peakDf = pd.concat(dfs, axis = 1)
+    peak_df = pd.concat(dfs, axis = 1)
     
     massProfileFiles.sort()
     dfs = []
     for file in massProfileFiles:
-        df = pd.read_csv(os.path.join(dataPath,file), header = None)
+        df = pd.read_csv(os.path.join(data_path,file), header = None)
         dfs.append(df)
-    massProfileDf = pd.concat(dfs, axis = 1)
+    mass_profile_df = pd.concat(dfs, axis = 1)
     
     del dfs
     del df
     
     ### Pre-process Data - Normalise peak height and remove abnormal samples
-    peakDf = peakDf - np.min(peakDf)
-    peakDf.fillna(0, inplace = True)
+    peak_df = peak_df - np.min(peak_df)
+    peak_df.fillna(0, inplace = True)
     
-    peakDfOrig = peakDf.copy()
-    peakDfOrig = peakDfOrig.transpose()
-    peakDfOrig.reset_index(inplace = True, drop = True)
+    peak_df_orig = peak_df.copy()
+    peak_df_orig = peak_df_orig.transpose()
+    peak_df_orig.reset_index(inplace = True, drop = True)
 
     # Normalise peaks
-    peakDfMax = peakDf.max(axis=0)
-    peakDf = peakDf.divide(peakDfMax, axis=1)
-    peakDf = peakDf.transpose()
-    peakDf.reset_index(inplace = True, drop = True)
+    peak_df_max = peak_df.max(axis=0)
+    peak_df = peak_df.divide(peak_df_max, axis=1)
+    peak_df = peak_df.transpose()
+    peak_df.reset_index(inplace = True, drop = True)
     
     
-    massProfileDf = massProfileDf - np.min(massProfileDf)
-    massProfileDf.fillna(0, inplace = True)
+    mass_profile_df = mass_profile_df - np.min(mass_profile_df)
+    mass_profile_df.fillna(0, inplace = True)
     
-    massProfileDfMax = massProfileDf.max(axis=0)
-    massProfileDf = massProfileDf.divide(massProfileDfMax, axis=1)
-    massProfileDf = massProfileDf.transpose()
-    massProfileDf.reset_index(inplace = True, drop = True)
-    
-    
-    idx = sequenceDf > 0
-    sequenceDf[idx] = np.log2(sequenceDf[idx])
-    sequenceDf = sequenceDf.transpose()
+    mass_profile_df_max = mass_profile_df.max(axis=0)
+    mass_profile_df = mass_profile_df.divide(mass_profile_df_max, axis=1)
+    mass_profile_df = mass_profile_df.transpose()
+    mass_profile_df.reset_index(inplace = True, drop = True)
     
     
-    peakDfMax.reset_index(inplace = True, drop = True)
+    idx = chromatogram_df > 0
+    chromatogram_df[idx] = np.log2(chromatogram_df[idx])
+    chromatogram_df = chromatogram_df.transpose()
+    
+    
+    peak_df_max.reset_index(inplace = True, drop = True)
 
-    return infoDf, peakDf, massProfileDf, sequenceDf, peakDfOrig, peakDfMax
+    return info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max
 
 
 def printShapes():
     pass
-#     print('trainingTime1:', trainingTime1.shape)
-#     print('trainingTime2:', trainingTime2.shape)
-#     print('trainingPeakProfile1:', trainingPeakProfile1.shape)
-#     print('trainingPeakProfile2:', trainingPeakProfile2.shape)
-#     print('trainingMassProfile1:', trainingMassProfile1.shape)
-#     print('trainingMassProfile2:', trainingMassProfile2.shape)
-#     print('trainingSequenceProfile1:', trainingSequenceProfile1.shape)
-#     print('trainingSequenceProfile2:', trainingSequenceProfile2.shape)
-#     print('trainingY:', trainingY.shape)
+#     print('train_time_1:', train_time_1.shape)
+#     print('train_time_2:', train_time_2.shape)
+#     print('train_peak_1:', train_peak_1.shape)
+#     print('train_peak_2:', train_peak_2.shape)
+#     print('train_mass_spectrum_1:', train_mass_spectrum_1.shape)
+#     print('train_mass_spectrum_2:', train_mass_spectrum_2.shape)
+#     print('train_chrom_seg_1:', train_chrom_seg_1.shape)
+#     print('train_chrom_seg_2:', train_chrom_seg_2.shape)
+#     print('train_y:', train_y.shape)
 #     print('---')
-#     print('testingTime1:', testingTime1.shape)
-#     print('testingTime2:', testingTime2.shape)
-#     print('testingPeakProfile1:', testingPeakProfile1.shape)
-#     print('testingPeakProfile2:', testingPeakProfile2.shape)
-#     print('testingMassProfile1:', testingMassProfile1.shape)
-#     print('testingMassProfile2:', testingMassProfile2.shape)
-#     print('testingSequenceProfile1:', testingSequenceProfile1.shape)
-#     print('testingSequenceProfile2:', testingSequenceProfile2.shape)
-#     print('testingY:', testingY.shape)
-#     print('testingComparisions:', testingComparisions.shape)
+#     print('test_time_1:', test_time_1.shape)
+#     print('test_time_2:', test_time_2.shape)
+#     print('test_peak_1:', test_peak_1.shape)
+#     print('test_peak_2:', test_peak_2.shape)
+#     print('test_mass_spectrum_1:', test_mass_spectrum_1.shape)
+#     print('test_mass_spectrum_2:', test_mass_spectrum_2.shape)
+#     print('test_chrom_seg_1:', test_chrom_seg_1.shape)
+#     print('test_chrom_seg_2:', test_chrom_seg_2.shape)
+#     print('test_y:', test_y.shape)
 
 
 # def printShapes():
-#     print('dataTimeDiff:', dataTimeDiff.shape)
-#     print('dataPeakProfile1:', dataPeakProfile1.shape)
-#     print('dataPeakProfile2:', dataPeakProfile2.shape)
-#     print('dataMassProfile1:', dataMassProfile1.shape)
-#     print('dataMassProfile2:', dataMassProfile2.shape)
-#     print('sequenceProfile1:', sequenceProfile1.shape)
-#     print('sequenceProfile2:', sequenceProfile2.shape)
+#     print('data_time_diff:', data_time_diff.shape)
+#     print('data_peak_1:', data_peak_1.shape)
+#     print('data_peak_2:', data_peak_2.shape)
+#     print('data_mass_spectrum_1:', data_mass_spectrum_1.shape)
+#     print('data_mass_spectrum_2:', data_mass_spectrum_2.shape)
+#     print('data_chrom_seg_1:', data_chrom_seg_1.shape)
+#     print('data_chrom_seg_1:', data_chrom_seg_1.shape)
 
 
-def getChromatographSegmentDf(infoDf, sequenceDf, sequence_length):
-    peaks = len(infoDf)
-    surroundsDf = np.zeros((peaks, sequence_length))
-    peakTimes = infoDf['peakMaxTime']
-    files = infoDf['File'].apply(str)
-    timeIdx = np.argmin(np.abs(peakTimes.values.reshape((1,-1)) - sequenceDf.columns.values.reshape((-1,1))), axis = 0)
+def getChromatographSegmentDf(info_df, chromatogram_df, sequence_length):
+    peaks = len(info_df)
+    chrom_seg_df = np.zeros((peaks, sequence_length))
+    peakTimes = info_df['peakMaxTime']
+    files = info_df['File'].apply(str)
+    timeIdx = np.argmin(np.abs(peakTimes.values.reshape((1,-1)) - chromatogram_df.columns.values.reshape((-1,1))), axis = 0)
     
     for i in range(peaks):
         seq = np.zeros(sequence_length)
         t = timeIdx[i] - sequence_length // 2
         if t < 0:
-            seq[-t:] = sequenceDf.loc[files.iloc[i]].iloc[:(timeIdx[i] + sequence_length // 2)].copy()
+            seq[-t:] = chromatogram_df.loc[files.iloc[i]].iloc[:(timeIdx[i] + sequence_length // 2)].copy()
         else:
-            insert = sequenceDf.loc[files.iloc[i]].iloc[(timeIdx[i] - sequence_length // 2): (timeIdx[i] + sequence_length // 2)].copy()
+            insert = chromatogram_df.loc[files.iloc[i]].iloc[(timeIdx[i] - sequence_length // 2): (timeIdx[i] + sequence_length // 2)].copy()
             seq[:len(insert)] = insert    
         
         idx = seq > 0
         seq[idx] = seq[idx] - np.min(seq[idx])
-        surroundsDf[i] = seq
+        chrom_seg_df[i] = seq
     
-    return pd.DataFrame(surroundsDf)
+    return pd.DataFrame(chrom_seg_df)
 
 
-def generateCombinationIndices(infoDf, timeCutOff = None, returnY = True, shuffle = False, setRandomSeed = None):
-    if setRandomSeed is not None:
-        # Set seed for repeatability in tests and to get the same dataset when continuing training from checkpoint
-        np.random.seed(setRandomSeed)
+def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, random_seed = None):
+    if random_seed is not None:
+        # Set seed to get the same dataset when continuing training from checkpoint
+        np.random.seed(random_seed)
 
-    comparisons = np.array(list(itertools.combinations(infoDf.index, 2)))
+    comparisons = np.array(list(itertools.combinations(info_df.index, 2)))
 
-    if timeCutOff is not None:
+    if time_cutoff is not None:
         x1 = comparisons[:,0]
         x2 = comparisons[:,1]
-        x1Time = infoDf.loc[x1]['peakMaxTime'].values
-        x2Time = infoDf.loc[x2]['peakMaxTime'].values
-        dataTimeDiff = abs(x1Time - x2Time)
-        withinTimeCutOff = dataTimeDiff < timeCutOff
-        comparisons = comparisons[withinTimeCutOff]
+        x1_time = info_df.loc[x1]['peakMaxTime'].values
+        x2_time = info_df.loc[x2]['peakMaxTime'].values
+        data_time_diff = abs(x1_time - x2_time)
+        within_time_cutoff = data_time_diff < time_cutoff
+        comparisons = comparisons[within_time_cutoff]
 
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
 
-    if returnY:
-        x1_group = infoDf.loc[x1,'Group']
-        x2_group = infoDf.loc[x2,'Group']
+    if return_y:
+        x1_group = info_df.loc[x1,'Group']
+        x2_group = info_df.loc[x2,'Group']
         new_x1 = []
         new_x2 = []
         y = []
-        groups = infoDf['Group'].unique()
+        groups = info_df['Group'].unique()
         for group in groups:
             x1_in_group = x1_group == group
             x2_in_group = x2_group == group
@@ -169,16 +168,14 @@ def generateCombinationIndices(infoDf, timeCutOff = None, returnY = True, shuffl
 
         assert len(new_x1) == len(new_x2) == len(y)
 
-
-
         return np.array(new_x1), np.array(new_x2), y
 
     return comparisons
 
 
-def getRealGroupAssignments(infoDf):
+def getRealGroupAssignments(info_df):
     groups = {}
-    for group, indexes in infoDf.groupby('Group').groups.items():
+    for group, indexes in info_df.groupby('Group').groups.items():
         if group < 0: continue  # Don't align negative groups. Leave them with their original times
         groups[group] = set(indexes)
     return groups
@@ -211,23 +208,23 @@ def plotSpectrum(times, fileIndex, maxValues, resolution = 1/300, buffer = 5,
     
     return pcm
 
-def plotSpectrumTogether(infoDf, maxValues, withReal = False, saveName = None):
-    minTime = min(infoDf['startTime'])
-    maxTime = max(infoDf['endTime'])
+def plotSpectrumTogether(info_df, maxValues, with_real = False, save_name = None):
+    minTime = min(info_df['startTime'])
+    maxTime = max(info_df['endTime'])
     
-    if withReal:
+    if with_real:
         fig, axes = plt.subplots(3,1)
     else:
         fig, axes = plt.subplots(2,1)
     axes[0].set_title('Unaligned', fontdict = {'fontsize': 11})
-    plotSpectrum(infoDf.peakMaxTime, infoDf.File, maxValues,
+    plotSpectrum(info_df.peakMaxTime, info_df.File, maxValues,
                  minTime = minTime, maxTime = maxTime, ax = axes[0])
     axes[1].set_title('Aligned', fontdict = {'fontsize': 11})
-    pcm = plotSpectrum(infoDf.AlignedTime, infoDf.File, maxValues,
+    pcm = plotSpectrum(info_df.AlignedTime, info_df.File, maxValues,
                  minTime = minTime, maxTime = maxTime, ax = axes[1])
-    if withReal:
+    if with_real:
         axes[2].set_title('Truth', fontdict = {'fontsize': 11})
-        plotSpectrum(infoDf.RealAlignedTime, infoDf.File, maxValues,
+        plotSpectrum(info_df.RealAlignedTime, info_df.File, maxValues,
                      minTime = minTime, maxTime = maxTime, ax = axes[2])
         
     # Put retention time as x axis on the bottom-most plot
@@ -242,21 +239,21 @@ def plotSpectrumTogether(infoDf, maxValues, withReal = False, saveName = None):
 #    fig.subplots_adjust(hspace = 0.3, wspace = 10)
 #    fig.colorbar(pcm, ax=axes.ravel().tolist(), fraction = 0.05, pad = 0.01)
     
-    if saveName is not None:
-        plt.savefig(saveName + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
+    if save_name is not None:
+        plt.savefig(save_name + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
     else:
         plt.show()
 
 
-def plotPeaks(times, infoDf, peakDf, minTime, maxTime, resolution = 1/300, buffer = 10):
+def plotPeaks(times, info_df, peak_df, minTime, maxTime, resolution = 1/300, buffer = 10):
     '''
     resolution = minutes per index step
     '''
-    numberOfFiles = infoDf.File.max() + 1
+    numberOfFiles = info_df.File.max() + 1
     timeSteps = np.ceil((maxTime - minTime) / resolution + buffer * 2).astype(int)
     peaks = np.zeros((timeSteps, numberOfFiles))
-    for row in infoDf.iterrows():
-        peakProfile = peakDf.loc[row[0]]
+    for row in info_df.iterrows():
+        peakProfile = peak_df.loc[row[0]]
         peakProfile = peakProfile[np.flatnonzero(peakProfile)]  # Remove the zeros (which were added during the preprocessing)
         peakProfileLength = len(peakProfile)
         stepsFromPeak = np.round((row[1]['peakMaxTime'] - row[1]['startTime']) / resolution).astype(int)
@@ -269,13 +266,13 @@ def plotPeaks(times, infoDf, peakDf, minTime, maxTime, resolution = 1/300, buffe
     return peaks, times
 
 
-def plotPeaksTogether(infoDf, peakDf, withReal = False, saveName = None):
-    minTime = min(infoDf['startTime'])
-    maxTime = max(infoDf['endTime'])
-    peaks, _ = plotPeaks(infoDf.AlignedTime, infoDf, peakDf, minTime, maxTime)
-    orig_peaks, time = plotPeaks(infoDf.peakMaxTime, infoDf, peakDf, minTime, maxTime)
-    if withReal:
-        real_peaks, time = plotPeaks(infoDf.RealAlignedTime, infoDf, peakDf, minTime, maxTime)
+def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None):
+    minTime = min(info_df['startTime'])
+    maxTime = max(info_df['endTime'])
+    peaks, _ = plotPeaks(info_df.AlignedTime, info_df, peak_df, minTime, maxTime)
+    orig_peaks, time = plotPeaks(info_df.peakMaxTime, info_df, peak_df, minTime, maxTime)
+    if with_real:
+        real_peaks, time = plotPeaks(info_df.RealAlignedTime, info_df, peak_df, minTime, maxTime)
         fig, axes = plt.subplots(3,1)
         axes[2].plot(time, real_peaks)
         axes[2].set_title('Truth', fontdict = {'fontsize': 11})
@@ -301,7 +298,7 @@ def plotPeaksTogether(infoDf, peakDf, withReal = False, saveName = None):
     plt.tight_layout()
     fig.subplots_adjust(hspace = 0.3, wspace = 10)
     
-    if saveName is not None:
-        plt.savefig(saveName + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
+    if save_name is not None:
+        plt.savefig(save_name + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
     else:
         plt.show()

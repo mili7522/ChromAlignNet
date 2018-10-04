@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import os
 import fnmatch
 
-dataPath = 'F:/GCMS/results/airSamples/sigThreshold_10/0fullResults'
-#dataPath = 'F:/GCMS/results/healthyControl/sigThreshold_10/0fullResults'
-#dataPath = 'D:/Files/Documents/SkyDrive/GCMS/results/instrumentStability/Cycle1/sigThreshold_2/0fullResults'
+data_path = 'F:/GCMS/results/airSamples/sigThreshold_10/0fullResults'
+#data_path = 'F:/GCMS/results/healthyControl/sigThreshold_10/0fullResults'
+#data_path = 'D:/Files/Documents/SkyDrive/GCMS/results/instrumentStability/Cycle1/sigThreshold_2/0fullResults'
 outPath = '../Data/Temp/'
 
 #masses = [39, 41, 42, 43, 55, 56, 57, 58, 71, 72, 74, 85, 100]
@@ -22,7 +22,7 @@ sortByPeakArea = False
 
 # Get files
 files = []
-for f in os.listdir(dataPath):
+for f in os.listdir(data_path):
     if fnmatch.fnmatch(f, '*.mat'):
         files.append(f)
 #files.sort()
@@ -38,7 +38,7 @@ for i in range(min(filesToProcess, len(files))):
     file = files[i]
     
     # Load data from .mat file
-    data = loadmat(os.path.join(dataPath, file))
+    data = loadmat(os.path.join(data_path, file))
     massZ = data['massZ']
     resMSPeak = data['resMSPeak']
     peakData = data['peakData']
