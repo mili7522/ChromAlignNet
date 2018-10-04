@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import itertools
 import os
 
@@ -173,3 +174,134 @@ def generateCombinationIndices(infoDf, timeCutOff = None, returnY = True, shuffl
         return np.array(new_x1), np.array(new_x2), y
 
     return comparisons
+
+
+def getRealGroupAssignments(infoDf):
+    groups = {}
+    for group, indexes in infoDf.groupby('Group').groups.items():
+        if group < 0: continue  # Don't align negative groups. Leave them with their original times
+        groups[group] = set(indexes)
+    return groups
+
+
+def plotSpectrum(times, fileIndex, maxValues, resolution = 1/300, buffer = 5,
+                 minTime = None, maxTime = None, ax = None, clip = 1E4):
+    if minTime is None:
+        minTime = min(times)
+    timeIndex = np.round((times - minTime) / resolution).astype(int)
+    if maxTime is None:
+        maxTimeIndex = max(timeIndex)
+    else:
+        maxTimeIndex = np.ceil((maxTime - minTime) / resolution).astype(int)
+    
+    numberOfFiles = fileIndex.max() + 1
+    spectrum = np.zeros((numberOfFiles, maxTimeIndex + buffer * 2))
+#    spectrum[fileIndex, timeIndex + buffer] = 1
+    spectrum[fileIndex, timeIndex + buffer] = np.clip(maxValues, 0, clip)
+#    spectrum[fileIndex, timeIndex + buffer] = maxValues
+    
+    if ax is None:
+        ax = plt.axes()
+#    pcm = ax.imshow(spectrum, norm=colors.LogNorm(vmin=1, vmax=maxValues.max()), cmap = 'hot', aspect = 'auto',
+    pcm = ax.imshow(spectrum, cmap = 'inferno', aspect = 'auto',
+                extent = [minTime - buffer * resolution, maxTime + buffer * resolution, 0, 1])
+    ax.set_axis_off()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    
+    return pcm
+
+def plotSpectrumTogether(infoDf, maxValues, withReal = False, saveName = None):
+    minTime = min(infoDf['startTime'])
+    maxTime = max(infoDf['endTime'])
+    
+    if withReal:
+        fig, axes = plt.subplots(3,1)
+    else:
+        fig, axes = plt.subplots(2,1)
+    axes[0].set_title('Unaligned', fontdict = {'fontsize': 11})
+    plotSpectrum(infoDf.peakMaxTime, infoDf.File, maxValues,
+                 minTime = minTime, maxTime = maxTime, ax = axes[0])
+    axes[1].set_title('Aligned', fontdict = {'fontsize': 11})
+    pcm = plotSpectrum(infoDf.AlignedTime, infoDf.File, maxValues,
+                 minTime = minTime, maxTime = maxTime, ax = axes[1])
+    if withReal:
+        axes[2].set_title('Truth', fontdict = {'fontsize': 11})
+        plotSpectrum(infoDf.RealAlignedTime, infoDf.File, maxValues,
+                     minTime = minTime, maxTime = maxTime, ax = axes[2])
+        
+    # Put retention time as x axis on the bottom-most plot
+    axes[-1].set_axis_on()
+    axes[-1].get_xaxis().set_visible(True)
+    axes[-1].spines['top'].set_visible(False)
+    axes[-1].spines['right'].set_visible(False)
+    axes[-1].spines['left'].set_visible(False)
+    axes[-1].set_xlabel('Retention Time (min)', fontdict = {'fontsize': 11})
+    
+    plt.tight_layout()
+#    fig.subplots_adjust(hspace = 0.3, wspace = 10)
+#    fig.colorbar(pcm, ax=axes.ravel().tolist(), fraction = 0.05, pad = 0.01)
+    
+    if saveName is not None:
+        plt.savefig(saveName + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
+    else:
+        plt.show()
+
+
+def plotPeaks(times, infoDf, peakDf, minTime, maxTime, resolution = 1/300, buffer = 10):
+    '''
+    resolution = minutes per index step
+    '''
+    numberOfFiles = infoDf.File.max() + 1
+    timeSteps = np.ceil((maxTime - minTime) / resolution + buffer * 2).astype(int)
+    peaks = np.zeros((timeSteps, numberOfFiles))
+    for row in infoDf.iterrows():
+        peakProfile = peakDf.loc[row[0]]
+        peakProfile = peakProfile[np.flatnonzero(peakProfile)]  # Remove the zeros (which were added during the preprocessing)
+        peakProfileLength = len(peakProfile)
+        stepsFromPeak = np.round((row[1]['peakMaxTime'] - row[1]['startTime']) / resolution).astype(int)
+        alignedPeakTime = times.loc[row[0]]
+        peakStepsFromBeginning = np.round((alignedPeakTime - minTime) / resolution).astype(int)
+        peaks[peakStepsFromBeginning - stepsFromPeak + buffer: peakStepsFromBeginning - stepsFromPeak + peakProfileLength + buffer,
+              int(row[1]['File'])] = peakProfile
+    
+    times = np.linspace(minTime - resolution * buffer, maxTime + resolution * buffer, timeSteps)
+    return peaks, times
+
+
+def plotPeaksTogether(infoDf, peakDf, withReal = False, saveName = None):
+    minTime = min(infoDf['startTime'])
+    maxTime = max(infoDf['endTime'])
+    peaks, _ = plotPeaks(infoDf.AlignedTime, infoDf, peakDf, minTime, maxTime)
+    orig_peaks, time = plotPeaks(infoDf.peakMaxTime, infoDf, peakDf, minTime, maxTime)
+    if withReal:
+        real_peaks, time = plotPeaks(infoDf.RealAlignedTime, infoDf, peakDf, minTime, maxTime)
+        fig, axes = plt.subplots(3,1)
+        axes[2].plot(time, real_peaks)
+        axes[2].set_title('Truth', fontdict = {'fontsize': 11})
+    else:
+        fig, axes = plt.subplots(2,1)
+    axes[0].plot(time, orig_peaks)
+    axes[0].set_title('Unaligned', fontdict = {'fontsize': 11})
+    axes[1].plot(time, peaks)
+    axes[1].set_title('Aligned', fontdict = {'fontsize': 11})
+    for ax in axes[:-1]:
+        ax.set_axis_off()
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        ax.set_xlim(time[0], time[-1])
+        
+    axes[-1].spines['top'].set_visible(False)
+    axes[-1].spines['right'].set_visible(False)
+    axes[-1].spines['left'].set_visible(False)
+    axes[-1].get_yaxis().set_visible(False)
+    axes[-1].set_xlim(time[0], time[-1])
+    axes[-1].set_xlabel('Retention Time (min)', fontdict = {'fontsize': 11})
+    
+    plt.tight_layout()
+    fig.subplots_adjust(hspace = 0.3, wspace = 10)
+    
+    if saveName is not None:
+        plt.savefig(saveName + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
+    else:
+        plt.show()
