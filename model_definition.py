@@ -123,8 +123,8 @@ class ChromAlignModel:
             components = [mass_comparison, chromatogram_comparison, time_diff]
         else:
             components = [mass_comparison, peak_comparison, chromatogram_comparison, time_diff]
+
         combined_outputs = Lambda(lambda x: K.concatenate(x, axis = -1))(components)
-        
         combined_outputs = Dropout(self.combined_output_dropout_percentage)(combined_outputs)
         combined_model = Dense(self.combined_output_neurons, activation = 'relu')(combined_outputs)
         combined_prediction = Dense(1, activation = 'sigmoid', name = 'main_prediction')(combined_model)

@@ -2,11 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 # import importlib
+import time
 import sys
 import os
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
 from tensorflow.keras.optimizers import Adam
 from utils import loadData, printShapes, getChromatographSegmentDf, generateCombinationIndices
 from model_definition import getModelVariant
@@ -18,8 +19,9 @@ batch_size = 128
 validation_split = 0.1
 adamOptimizerOptions = {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999}
 trainWithGPU = True
+randomSeedType = 1  # Type 1 
 
-saveCheckpoints = False  # If checkpoints exist, training will resume from the last checkpoint
+saveCheckpoints = True  # If checkpoints exist, training will resume from the last checkpoint
 saveHistory = True
 modelPath = 'SavedModels'
 modelName = 'ChromAlignNet'
@@ -55,6 +57,12 @@ ignorePeakProfile = getattr(ChromAlignModel, 'ignorePeakProfile')
 modelName = modelName + '-' + datasetSelection + '-{:02d}'.format(modelVariant) + '-r' + str(repetition).rjust(2, '0')
 
 print("Output model to: ", modelName)
+
+randomSeed = int(ord(datasetSelection) * 1E4 + modelVariant * 1E2 + repetition)
+if randomSeedType == 2:
+    randomSeed = randomSeed + int(time.time())
+with open(os.path.join(modelPath, modelName) + '-RandomSeed.txt', 'w') as f:
+  f.write('%d' % randomSeed)
 
 if trainWithGPU:
     config = tf.ConfigProto()
@@ -113,7 +121,7 @@ for dataPath in dataPaths:
     print("Dropped rows: {}".format(np.sum(keepIndex == False)))
 
     a = len(dataY)
-    x1, x2, y = generateCombinationIndices(infoDf, timeCutOff = None, returnY = True, shuffle = False, setRandomSeed = 100)
+    x1, x2, y = generateCombinationIndices(infoDf, timeCutOff = None, returnY = True, shuffle = False, setRandomSeed = randomSeed)
     dataTime1.extend(infoDf.loc[x1]['peakMaxTime'])
     dataTime2.extend(infoDf.loc[x2]['peakMaxTime'])
     if not ignorePeakProfile:
@@ -127,6 +135,7 @@ for dataPath in dataPaths:
     print(len(dataY) - a, 'combinations generated')
     
 ### Shuffle data
+np.random.seed(randomSeed)
 shuffleIndex = np.random.permutation(len(dataTime1))
 dataTime1 = np.array(dataTime1)[shuffleIndex]
 dataTime2 = np.array(dataTime2)[shuffleIndex]
@@ -199,10 +208,10 @@ else:
     model = define_model(max_mass_seq_length, sequence_length)
     initial_epoch = 0
 
+
+loss_weights = [1., 0.2, 0.2, 0.2]
 if ignorePeakProfile:
-    loss_weights = [1., 0.2, 0.2]
-else:
-    loss_weights = [1., 0.2, 0.2, 0.2]
+    loss_weights = loss_weights[:-1]
 
 model.compile(optimizer = Adam(**adamOptimizerOptions),
               loss = 'binary_crossentropy',
@@ -213,13 +222,18 @@ model.compile(optimizer = Adam(**adamOptimizerOptions),
 if os.path.isdir(modelPath) == False:
     os.makedirs(modelPath)
 
+if saveHistory:
+    logger = CSVLogger(os.path.join(modelPath, modelName) + '-History.csv', separator = ',', append = True)
+else:
+    logger = None
 if saveCheckpoints:
     if os.path.isdir(os.path.join(modelPath, modelName + '-Checkpoint')) == False:
         os.makedirs(os.path.join(modelPath, modelName + '-Checkpoint'))
     checkpoint = ModelCheckpoint(os.path.join(modelPath, modelName + '-Checkpoint', modelName) + '-Checkpoint-{epoch:03d}.h5')
-    callbacks = [checkpoint]
+    
+    callbacks = [checkpoint] + ([logger] if logger is not None else [])
 else:
-    callbacks = None
+    callbacks = [logger] if logger is not None else None
 
 if ignorePeakProfile:
     training_data = [trainingMassProfile1, trainingMassProfile2,
@@ -244,10 +258,6 @@ history = model.fit(training_data,
 
 
 model.save(os.path.join(modelPath, modelName) + '.h5')
-
-if saveHistory:
-    histDf = pd.DataFrame(history.history)
-    histDf.to_csv(os.path.join(modelPath, modelName) + '-History.csv')
 
 
 if ignorePeakProfile:
