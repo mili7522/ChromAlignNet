@@ -103,20 +103,20 @@ def printShapes():
 #     print('data_chrom_seg_1:', data_chrom_seg_1.shape)
 
 
-def getChromatographSegmentDf(info_df, chromatogram_df, sequence_length):
+def getChromatographSegmentDf(info_df, chromatogram_df, segment_length):
     peaks = len(info_df)
-    chrom_seg_df = np.zeros((peaks, sequence_length))
-    peakTimes = info_df['peakMaxTime']
+    chrom_seg_df = np.zeros((peaks, segment_length))
+    peak_times = info_df['peakMaxTime']
     files = info_df['File'].apply(str)
-    timeIdx = np.argmin(np.abs(peakTimes.values.reshape((1,-1)) - chromatogram_df.columns.values.reshape((-1,1))), axis = 0)
+    time_idx = np.argmin(np.abs(peak_times.values.reshape((1,-1)) - chromatogram_df.columns.values.reshape((-1,1))), axis = 0)
     
     for i in range(peaks):
-        seq = np.zeros(sequence_length)
-        t = timeIdx[i] - sequence_length // 2
+        seq = np.zeros(segment_length)
+        t = time_idx[i] - segment_length // 2
         if t < 0:
-            seq[-t:] = chromatogram_df.loc[files.iloc[i]].iloc[:(timeIdx[i] + sequence_length // 2)].copy()
+            seq[-t:] = chromatogram_df.loc[files.iloc[i]].iloc[:(time_idx[i] + segment_length // 2)].copy()
         else:
-            insert = chromatogram_df.loc[files.iloc[i]].iloc[(timeIdx[i] - sequence_length // 2): (timeIdx[i] + sequence_length // 2)].copy()
+            insert = chromatogram_df.loc[files.iloc[i]].iloc[(time_idx[i] - segment_length // 2): (time_idx[i] + segment_length // 2)].copy()
             seq[:len(insert)] = insert    
         
         idx = seq > 0
@@ -191,8 +191,8 @@ def plotSpectrum(times, fileIndex, maxValues, resolution = 1/300, buffer = 5,
     else:
         maxTimeIndex = np.ceil((maxTime - minTime) / resolution).astype(int)
     
-    numberOfFiles = fileIndex.max() + 1
-    spectrum = np.zeros((numberOfFiles, maxTimeIndex + buffer * 2))
+    number_of_files = fileIndex.max() + 1
+    spectrum = np.zeros((number_of_files, maxTimeIndex + buffer * 2))
 #    spectrum[fileIndex, timeIndex + buffer] = 1
     spectrum[fileIndex, timeIndex + buffer] = np.clip(maxValues, 0, clip)
 #    spectrum[fileIndex, timeIndex + buffer] = maxValues
@@ -253,14 +253,14 @@ def plotPeaks(times, info_df, peak_df, minTime, maxTime, resolution = 1/300, buf
     timeSteps = np.ceil((maxTime - minTime) / resolution + buffer * 2).astype(int)
     peaks = np.zeros((timeSteps, numberOfFiles))
     for row in info_df.iterrows():
-        peakProfile = peak_df.loc[row[0]]
-        peakProfile = peakProfile[np.flatnonzero(peakProfile)]  # Remove the zeros (which were added during the preprocessing)
-        peakProfileLength = len(peakProfile)
+        peak = peak_df.loc[row[0]]
+        peak = peak[np.flatnonzero(peak)]  # Remove the zeros (which were added during the preprocessing)
+        peak_length = len(peak)
         stepsFromPeak = np.round((row[1]['peakMaxTime'] - row[1]['startTime']) / resolution).astype(int)
         alignedPeakTime = times.loc[row[0]]
         peakStepsFromBeginning = np.round((alignedPeakTime - minTime) / resolution).astype(int)
-        peaks[peakStepsFromBeginning - stepsFromPeak + buffer: peakStepsFromBeginning - stepsFromPeak + peakProfileLength + buffer,
-              int(row[1]['File'])] = peakProfile
+        peaks[peakStepsFromBeginning - stepsFromPeak + buffer: peakStepsFromBeginning - stepsFromPeak + peak_length + buffer,
+              int(row[1]['File'])] = peak
     
     times = np.linspace(minTime - resolution * buffer, maxTime + resolution * buffer, timeSteps)
     return peaks, times

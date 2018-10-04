@@ -18,6 +18,7 @@ from parameters import prediction_options
 # Load parameters
 ignore_negatives = prediction_options.get('ignore_negatives')
 time_cutoff = prediction_options.get('time_cutoff')
+predictions_save_name = prediction_options.get('predictions_save_name')
 
 model_path = prediction_options.get('model_path')
 model_file = prediction_options.get('model_file')
@@ -68,7 +69,7 @@ def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_pr
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
     print(np.flatnonzero(keep_index == False))
 
-    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, sequence_length = 600)
+    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
 
     #%% Generate data combinations
     comparisons = generateCombinationIndices(info_df[keep_index], time_cutoff = time_cutoff, return_y = False)
@@ -87,12 +88,12 @@ def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_pr
 
     samples, max_peak_seq_length = data_peak_1.shape
     _, max_mass_seq_length = data_mass_spectrum_1.shape
-    _, sequence_length = data_chrom_seg_1.shape
+    _, segment_length = data_chrom_seg_1.shape
 
     print('Number of samples:', samples)
     print('Max peak sequence length:', max_peak_seq_length)
-    print('Max mass sequence length:', max_mass_seq_length)
-    print('Surrounds sequence length:', sequence_length)
+    print('Max mass spectrum length:', max_mass_seq_length)
+    print('Chromatogram segment length:', segment_length)
 
     print('Time to load and generate samples:', round((time.time() - loadTime)/60, 2), 'min')
     print('\n')   # XRW
@@ -102,15 +103,15 @@ def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_pr
 
     if ignore_peak_profile:
         prediction_data = [data_mass_spectrum_1, data_mass_spectrum_2,
-                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
-                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
+                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
+                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
                             data_time_diff]
     else:
         prediction_data = [data_mass_spectrum_1, data_mass_spectrum_2,
                             data_peak_1.reshape((samples, max_peak_seq_length, 1)),
                             data_peak_2.reshape((samples, max_peak_seq_length, 1)),
-                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
-                            data_chrom_seg_1.reshape((samples, sequence_length, 1)),
+                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
+                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
                             data_time_diff]
 
     return prediction_data, comparisons, info_df, peak_df_orig, peak_df_max
@@ -211,6 +212,8 @@ def printConfusionMatrix(prediction, info_df, comparisons):
 if __name__ == "__main__":
     prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, info_file, sequence_file)
     prediction = runPrediction(prediction_data, model_path, model_file)
+    if predictions_save_name is not None:
+        np.savetxt(predictions_save_name, prediction)
 
     distance_matrix = getDistanceMatrix(comparisons, prediction, clip = 10)
 

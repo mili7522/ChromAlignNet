@@ -75,13 +75,13 @@ class ChromAlignModel:
 
         return peak_left_input, peak_right_input, peak_comparison, peak_prediction
 
-    def buildChromatogramEncoder(self, sequence_length):
-        chromatogram_input_shape = (sequence_length, 1)  # One channel input
+    def buildChromatogramEncoder(self, segment_length):
+        chromatogram_input_shape = (segment_length, 1)  # One channel input
         C_in = Input(chromatogram_input_shape)
         chromatogram_left_input = Input(chromatogram_input_shape)
         chromatogram_right_input = Input(chromatogram_input_shape)
         
-        # Sequence_length of 600, 200, 100, 50, etc
+        # Segment length of 600, 200, 100, 50, etc
         initial_filter_number = 3
         for i in range(self.number_of_left_convolution_stacks):
             F1 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F1)
@@ -90,7 +90,7 @@ class ChromAlignModel:
             if (self.chromatogram_convolution_dropout_percentage != 0) and (i != (self.number_of_left_convolution_stacks - 1)):
                 F1 = Dropout(self.chromatogram_convolution_dropout_percentage)(F1)
         
-        # Sequence length of 600, 200, 100, 50, etc
+        # Segment length of 600, 200, 100, 50, etc
         for i in range(self.number_of_right_convolution_stacks):
             F2 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F2)
             F2 = MaxPooling1D(3 if i == 0 else 2)(F2)
@@ -111,12 +111,12 @@ class ChromAlignModel:
         return chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction
 
 
-    def buildModel(self, max_mass_seq_length, sequence_length):
+    def buildModel(self, max_mass_seq_length, segment_length):
 
         mass_left_input, mass_right_input, mass_comparison, mass_prediction = self.buildMassEncoder(max_mass_seq_length)
         if not self.ignore_peak_profile:
             peak_left_input, peak_right_input, peak_comparison, peak_prediction = self.buildPeakEncoder()
-        chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction = self.buildChromatogramEncoder(sequence_length)
+        chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction = self.buildChromatogramEncoder(segment_length)
         time_diff = Input((1,))
 
         if self.ignore_peak_profile:

@@ -1,7 +1,5 @@
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
-# import importlib
 import time
 import sys
 import os
@@ -70,8 +68,8 @@ data_paths = list( datasets[i] for i in dataset_for_model[dataset_selection] )
 random_seed = int(ord(dataset_selection) * 1E4 + model_variant * 1E2 + repetition)
 if random_seed_type == 2:
     random_seed = random_seed + int(time.time())
-with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'w') as f:
-  f.write('%d' % random_seed)
+with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'a') as f:
+    f.write('%d' % random_seed)
 
 
 if train_with_gpu:
@@ -104,7 +102,7 @@ for data_path in data_paths:
     info_df = info_df[keep_index]
     peak_df = peak_df[keep_index]
     mass_profile_df = mass_profile_df[keep_index]
-    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, sequence_length = 600)
+    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
 
     a = len(data_y)
@@ -167,7 +165,7 @@ test_y = data_y[training:]
 
 if not ignore_peak_profile:
     samples, max_peak_seq_length = data_peak_1.shape
-samples, sequence_length = data_chrom_seg_1.shape
+samples, segment_length = data_chrom_seg_1.shape
 testing_samples, max_mass_seq_length = test_mass_spectrum_1.shape
 training_samples = training
 
@@ -176,8 +174,8 @@ print('Number of training samples:', training_samples)
 print('Number of testing samples:', testing_samples)
 if not ignore_peak_profile:
     print('Max peak length:', max_peak_seq_length)
-print('Sequence length:', sequence_length)
-print('Max mass sequence length:', max_mass_seq_length)
+print('Chromatogram segment length:', segment_length)
+print('Max mass spectrum length:', max_mass_seq_length)
 
 
 
@@ -192,7 +190,7 @@ if os.path.isdir(checkpoint_path) and os.listdir(checkpoint_path):
     model = load_model(last_checkpoint)
     initial_epoch = int(last_checkpoint[-6:-3])
 else:
-    model = buildModel(max_mass_seq_length, sequence_length)
+    model = buildModel(max_mass_seq_length, segment_length)
     initial_epoch = 0
 
 
@@ -221,15 +219,15 @@ else:
 
 if ignore_peak_profile:
     training_data = [train_mass_spectrum_1, train_mass_spectrum_2,
-                    train_chrom_seg_1.reshape((training_samples, sequence_length, 1)),
-                    train_chrom_seg_2.reshape((training_samples, sequence_length, 1)),
+                    train_chrom_seg_1.reshape((training_samples, segment_length, 1)),
+                    train_chrom_seg_2.reshape((training_samples, segment_length, 1)),
                     np.abs(train_time_2 - train_time_1)]
 else:
     training_data = [train_mass_spectrum_1, train_mass_spectrum_2,
                     train_peak_1.reshape((training_samples, max_peak_seq_length, 1)),
                     train_peak_2.reshape((training_samples, max_peak_seq_length, 1)),
-                    train_chrom_seg_1.reshape((training_samples, sequence_length, 1)),
-                    train_chrom_seg_2.reshape((training_samples, sequence_length, 1)),
+                    train_chrom_seg_1.reshape((training_samples, segment_length, 1)),
+                    train_chrom_seg_2.reshape((training_samples, segment_length, 1)),
                     np.abs(train_time_2 - train_time_1)]
 
 history = model.fit(training_data,
@@ -246,15 +244,15 @@ model.save(os.path.join(model_path, model_name) + '.h5')
 
 if ignore_peak_profile:
     prediction_data = [test_mass_spectrum_1, test_mass_spectrum_2,
-                        test_chrom_seg_1.reshape((testing_samples, sequence_length, 1)),
-                        test_chrom_seg_2.reshape((testing_samples, sequence_length, 1)),
+                        test_chrom_seg_1.reshape((testing_samples, segment_length, 1)),
+                        test_chrom_seg_2.reshape((testing_samples, segment_length, 1)),
                         np.abs(test_time_2 - test_time_1)]
 else:
     prediction_data = [test_mass_spectrum_1, test_mass_spectrum_2,
                         test_peak_1.reshape((testing_samples, max_peak_seq_length, 1)),
                         test_peak_2.reshape((testing_samples, max_peak_seq_length, 1)),
-                        test_chrom_seg_1.reshape((testing_samples, sequence_length, 1)),
-                        test_chrom_seg_2.reshape((testing_samples, sequence_length, 1)),
+                        test_chrom_seg_1.reshape((testing_samples, segment_length, 1)),
+                        test_chrom_seg_2.reshape((testing_samples, segment_length, 1)),
                         np.abs(test_time_2 - test_time_1)]
 
 ### Predict on test set
