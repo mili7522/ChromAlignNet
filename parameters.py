@@ -1,8 +1,7 @@
 training_options = {
     'epochs': 50,
     'batch_size': 128,
-    'test_split': 0.2,
-    'validation_split': 0.1,
+    'validation_split': 0.2,
     'adam_optimizer_options': {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999},
     'train_with_gpu': True,
     'random_seed_type': 1,  # Type 1 for repeatability within repetitions, type 2 for random

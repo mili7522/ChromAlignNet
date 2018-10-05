@@ -14,7 +14,6 @@ from parameters import training_options
 # Load parameters
 epochs = training_options.get('epochs')
 batch_size = training_options.get('batch_size')
-test_split = training_options.get('test_split')
 validation_split = training_options.get('validation_split')
 adam_optimizer_options = training_options.get('adam_optimizer_options')
 train_with_gpu = training_options.get('train_with_gpu')
@@ -140,44 +139,16 @@ data_chrom_seg_2 = np.array(pd.concat(data_chrom_seg_2))[shuffle_index]
 data_y = np.array(data_y)[shuffle_index]
 
 
-### Split into training and test sets
-training = int(len(data_time_1) * (1-test_split))
 
-train_time_1 = data_time_1[:training]
-train_time_2 = data_time_2[:training]
-if not ignore_peak_profile:
-    train_peak_1 = data_peak_1[:training]
-    train_peak_2 = data_peak_2[:training]
-train_mass_spectrum_1 = data_mass_spectrum_1[:training]
-train_mass_spectrum_2 = data_mass_spectrum_2[:training]
-train_chrom_seg_1 = data_chrom_seg_1[:training]
-train_chrom_seg_2 = data_chrom_seg_2[:training]
-train_y = data_y[:training]
-
-test_time_1 = data_time_1[training:]
-test_time_2 = data_time_2[training:]
-if not ignore_peak_profile:
-    test_peak_1 = data_peak_1[training:]
-    test_peak_2 = data_peak_2[training:]
-test_mass_spectrum_1 = data_mass_spectrum_1[training:]
-test_mass_spectrum_2 = data_mass_spectrum_2[training:]
-test_chrom_seg_1 = data_chrom_seg_1[training:]
-test_chrom_seg_2 = data_chrom_seg_2[training:]
-test_y = data_y[training:]
-
-if not ignore_peak_profile:
-    samples, max_peak_seq_length = data_peak_1.shape
 samples, segment_length = data_chrom_seg_1.shape
-testing_samples, max_mass_seq_length = test_mass_spectrum_1.shape
-training_samples = training
+_, max_mass_seq_length = data_mass_spectrum_1.shape
 
 print('Number of samples:', samples)
-print('Number of training samples:', training_samples)
-print('Number of testing samples:', testing_samples)
 if not ignore_peak_profile:
+    _, max_peak_seq_length = data_peak_1.shape
     print('Max peak length:', max_peak_seq_length)
 print('Chromatogram segment length:', segment_length)
-print('Max mass spectrum length:', max_mass_seq_length)
+print('Mass spectrum length:', max_mass_seq_length)
 
 
 
@@ -220,20 +191,20 @@ else:
     callbacks = [logger] if logger is not None else None
 
 if ignore_peak_profile:
-    training_data = [train_mass_spectrum_1, train_mass_spectrum_2,
-                    train_chrom_seg_1.reshape((training_samples, segment_length, 1)),
-                    train_chrom_seg_2.reshape((training_samples, segment_length, 1)),
-                    np.abs(train_time_2 - train_time_1)]
+    training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
+                    data_chrom_seg_1.reshape((samples, segment_length, 1)),
+                    data_chrom_seg_2.reshape((samples, segment_length, 1)),
+                    np.abs(data_time_2 - data_time_1)]
 else:
-    training_data = [train_mass_spectrum_1, train_mass_spectrum_2,
-                    train_peak_1.reshape((training_samples, max_peak_seq_length, 1)),
-                    train_peak_2.reshape((training_samples, max_peak_seq_length, 1)),
-                    train_chrom_seg_1.reshape((training_samples, segment_length, 1)),
-                    train_chrom_seg_2.reshape((training_samples, segment_length, 1)),
-                    np.abs(train_time_2 - train_time_1)]
+    training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
+                    data_peak_1.reshape((samples, max_peak_seq_length, 1)),
+                    data_peak_2.reshape((samples, max_peak_seq_length, 1)),
+                    data_chrom_seg_1.reshape((samples, segment_length, 1)),
+                    data_chrom_seg_2.reshape((samples, segment_length, 1)),
+                    np.abs(data_time_2 - data_time_1)]
 
 history = model.fit(training_data,
-                    [train_y] * (3 if ignore_peak_profile else 4),
+                    [data_y] * (3 if ignore_peak_profile else 4),
                     epochs = epochs,
                     batch_size = batch_size,
                     validation_split = validation_split,
@@ -242,31 +213,3 @@ history = model.fit(training_data,
 
 
 model.save(os.path.join(model_path, model_name) + '.h5')
-
-
-if ignore_peak_profile:
-    prediction_data = [test_mass_spectrum_1, test_mass_spectrum_2,
-                        test_chrom_seg_1.reshape((testing_samples, segment_length, 1)),
-                        test_chrom_seg_2.reshape((testing_samples, segment_length, 1)),
-                        np.abs(test_time_2 - test_time_1)]
-else:
-    prediction_data = [test_mass_spectrum_1, test_mass_spectrum_2,
-                        test_peak_1.reshape((testing_samples, max_peak_seq_length, 1)),
-                        test_peak_2.reshape((testing_samples, max_peak_seq_length, 1)),
-                        test_chrom_seg_1.reshape((testing_samples, segment_length, 1)),
-                        test_chrom_seg_2.reshape((testing_samples, segment_length, 1)),
-                        np.abs(test_time_2 - test_time_1)]
-
-### Predict on test set
-prediction = model.predict(prediction_data)
-
-prediction = prediction[0]  # Only take the main outcome
-
-wrong = abs(np.round(prediction).ravel() - test_y)
-wrongIndex = np.nonzero(wrong)[0]
-print('Number wrong:', np.sum(wrong))
-# Print some examples of wrong predictions
-for i in range(len(wrongIndex)):
-    if i > 30: break
-    print('Prediction:', prediction[wrongIndex[i]], 'Actual:', test_y[wrongIndex[i]])
-
