@@ -40,11 +40,11 @@ prediction_options = {
     'predictions_save_name': None,
 
     'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-A-20-r01',
-    # 'data_path': 'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/',
-    'data_path': 'data/2018-05-01-ExtractedPeaks-Breath103-WithMassSlice/',
+    'model_file': 'ChromAlignNet-A-02-r01',
+    'data_path': 'data/2018-05-14-ExtractedPeaks-Breath88-WithMassSlice-All/',
+    # 'data_path': 'data/2018-05-01-ExtractedPeaks-Breath103-WithMassSlice/',
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv'
 }
 
-prediction_options['predictions_save_name'] = 'SavedModels/{}_{}_Prediction.csv'.format(prediction_options['model_file'], prediction_options['data_path'].split('-')[4])
+prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(prediction_options['model_path'], prediction_options['model_file'], prediction_options['data_path'].split('-')[4])

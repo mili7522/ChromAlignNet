@@ -32,7 +32,7 @@ sequence_file = training_options.get('sequence_file')
 
 # Modify the model name for different data sources, model variants and repetitions
 if len(sys.argv) > 1:
-    assert sys.argv[1] in ('A', 'B', 'C', 'D', 'E', 'F'), "Dataset selection needs to be a letter between A and F"
+    assert sys.argv[1] in ('A', 'B', 'C', 'D', 'E', 'F', 'G'), "Dataset selection needs to be a letter between A and G"
     dataset_selection = sys.argv[1]
 else:
     dataset_selection = 'A'
@@ -102,6 +102,11 @@ for data_path in data_paths:
     info_df = info_df[keep_index]
     peak_df = peak_df[keep_index]
     mass_profile_df = mass_profile_df[keep_index]
+
+    info_df.reset_index(inplace = True, drop = True)
+    peak_df.reset_index(inplace = True, drop = True)
+    mass_profile_df.reset_index(inplace = True, drop = True)
+
     chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
 
