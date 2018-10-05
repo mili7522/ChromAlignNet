@@ -32,7 +32,7 @@ sequence_file = training_options.get('sequence_file')
 
 # Modify the model name for different data sources, model variants and repetitions
 if len(sys.argv) > 1:
-    assert sys.argv[1] in ('A', 'B', 'C', 'D', 'E', 'F'), "Dataset selection needs to be a letter between A and F"
+    assert sys.argv[1] in ('A', 'B', 'C', 'D', 'E', 'F', 'G'), "Dataset selection needs to be a letter between A and G"
     dataset_selection = sys.argv[1]
 else:
     dataset_selection = 'A'
@@ -67,6 +67,7 @@ data_paths = list( datasets[i] for i in dataset_for_model[dataset_selection] )
 random_seed = int(ord(dataset_selection) * 1E4 + model_variant * 1E2 + repetition)
 if random_seed_type == 2:
     random_seed = random_seed + int(time.time())
+# TODO
 # if random_seed_type == 3:
     # Load previous
 
@@ -104,7 +105,7 @@ for data_path in data_paths:
     chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
 
-    a = len(data_y)
+    prev_len = len(data_y)
     x1, x2, y = generateCombinationIndices(info_df, time_cutoff = None, return_y = True, random_seed = random_seed)
     data_time_1.extend(info_df.loc[x1]['peakMaxTime'])
     data_time_2.extend(info_df.loc[x2]['peakMaxTime'])
@@ -116,7 +117,7 @@ for data_path in data_paths:
     data_chrom_seg_1.append(chrom_seg_df.loc[x1])
     data_chrom_seg_2.append(chrom_seg_df.loc[x2])
     data_y.extend(y)
-    print(len(data_y) - a, 'combinations generated')
+    print(len(data_y) - prev_len, 'combinations generated')
     
 ### Shuffle data
 np.random.seed(random_seed)

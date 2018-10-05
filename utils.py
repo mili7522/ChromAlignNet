@@ -9,7 +9,7 @@ def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'W
     info_df = pd.read_csv(os.path.join(data_path, info_file), index_col = 0)
     chromatogram_df = pd.read_csv(os.path.join(data_path, sequence_file), index_col = 0)
     
-    ### Load peak and mass slice profiles
+    ### Load peak and mass spectra
     peakFiles = []
     massProfileFiles = []
     for f in os.listdir(data_path):
@@ -61,7 +61,7 @@ def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'W
     chromatogram_df[idx] = np.log2(chromatogram_df[idx])
     chromatogram_df = chromatogram_df.transpose()
     
-    # Index starts off as all 0s due to concatonation and transposing
+    # Index starts off as all 0s due to concatonation and transposing. Reset to consecutive integers
     peak_df.reset_index(inplace = True, drop = True)
     peak_df_orig.reset_index(inplace = True, drop = True)
     mass_profile_df.reset_index(inplace = True, drop = True)
