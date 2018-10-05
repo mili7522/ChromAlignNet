@@ -70,39 +70,6 @@ def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'W
     return info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max
 
 
-def printShapes():
-    pass
-#     print('train_time_1:', train_time_1.shape)
-#     print('train_time_2:', train_time_2.shape)
-#     print('train_peak_1:', train_peak_1.shape)
-#     print('train_peak_2:', train_peak_2.shape)
-#     print('train_mass_spectrum_1:', train_mass_spectrum_1.shape)
-#     print('train_mass_spectrum_2:', train_mass_spectrum_2.shape)
-#     print('train_chrom_seg_1:', train_chrom_seg_1.shape)
-#     print('train_chrom_seg_2:', train_chrom_seg_2.shape)
-#     print('train_y:', train_y.shape)
-#     print('---')
-#     print('test_time_1:', test_time_1.shape)
-#     print('test_time_2:', test_time_2.shape)
-#     print('test_peak_1:', test_peak_1.shape)
-#     print('test_peak_2:', test_peak_2.shape)
-#     print('test_mass_spectrum_1:', test_mass_spectrum_1.shape)
-#     print('test_mass_spectrum_2:', test_mass_spectrum_2.shape)
-#     print('test_chrom_seg_1:', test_chrom_seg_1.shape)
-#     print('test_chrom_seg_2:', test_chrom_seg_2.shape)
-#     print('test_y:', test_y.shape)
-
-
-# def printShapes():
-#     print('data_time_diff:', data_time_diff.shape)
-#     print('data_peak_1:', data_peak_1.shape)
-#     print('data_peak_2:', data_peak_2.shape)
-#     print('data_mass_spectrum_1:', data_mass_spectrum_1.shape)
-#     print('data_mass_spectrum_2:', data_mass_spectrum_2.shape)
-#     print('data_chrom_seg_1:', data_chrom_seg_1.shape)
-#     print('data_chrom_seg_1:', data_chrom_seg_1.shape)
-
-
 def getChromatographSegmentDf(info_df, chromatogram_df, segment_length):
     peaks = len(info_df)
     chrom_seg_df = np.zeros((peaks, segment_length))
@@ -241,6 +208,7 @@ def plotSpectrumTogether(info_df, maxValues, with_real = False, save_name = None
     
     if save_name is not None:
         plt.savefig(save_name + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
+        plt.savefig(save_name + '.eps', format = 'eps', bbox_inches = 'tight')
     else:
         plt.show()
 
@@ -300,5 +268,6 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None):
     
     if save_name is not None:
         plt.savefig(save_name + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
+        plt.savefig(save_name + '.eps', format = 'eps', bbox_inches = 'tight')
     else:
         plt.show()

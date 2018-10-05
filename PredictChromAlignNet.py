@@ -16,14 +16,12 @@ from parameters import prediction_options
 ignore_negatives = prediction_options.get('ignore_negatives')
 time_cutoff = prediction_options.get('time_cutoff')
 predictions_save_name = prediction_options.get('predictions_save_name')
-
 model_path = prediction_options.get('model_path')
 model_file = prediction_options.get('model_file')
-
 data_path = prediction_options.get('data_path')
 info_file = prediction_options.get('info_file')
 sequence_file = prediction_options.get('sequence_file')
-
+results_path = prediction_options.get('results_path')
 
 
 model_variant = int(model_file.split('-')[2])
@@ -202,6 +200,8 @@ if __name__ == "__main__":
     prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, info_file, sequence_file)
     prediction = runPrediction(prediction_data, model_path, model_file)
     if predictions_save_name is not None:
+        if os.path.isdir(results_path) == False:
+            os.makedirs(results_path)
         predictions_df = pd.DataFrame(np.concatenate((comparisons, prediction), axis = 1), columns = ['x1', 'x2', 'prediction'])
         predictions_df['x1'] = predictions_df['x1'].astype(int)
         predictions_df['x2'] = predictions_df['x2'].astype(int)
