@@ -21,12 +21,13 @@ training_options = {
                   'data/2018-05-14-ExtractedPeaks-Breath88-WithMassSlice-All/'
                 ],
     'dataset_for_model': {
-                         'A': [0, 1, 2], 
-                         'B': [0, 1, 2, 3],
-                         'C': [0, 1, 2, 4],
-                         'D': [0, 1, 2, 3, 4],
-                         'E': [0, 1, 2, 3, 4, 5],
-                         'F': [0, 1, 2, 3, 4, 6]
+                         'A': [0, 1], 
+                         'B': [0, 1, 2],
+                         'C': [0, 1, 3],
+                         'D': [0, 1, 4],
+                         'E': [0, 1, 3, 4],
+                         'F': [0, 1, 3, 5],
+                         'G': [0, 1, 3, 6]
                          },
 
     'info_file': 'PeakData-WithGroup.csv',

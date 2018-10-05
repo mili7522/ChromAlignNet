@@ -9,7 +9,8 @@ class ChromAlignModel:
                  mass_dropout_percentage = 0.2, peak_dropout_percentage = 0.2, chromatogram_dropout_percentage = 0.2,
                  number_of_left_convolution_stacks = 4, number_of_right_convolution_stacks = 3,
                  chromatogram_convolution_dropout_percentage = 0, combined_output_neurons = 64,
-                 combined_output_dropout_percentage = 0.2, ignore_peak_profile = False):
+                 combined_output_dropout_percentage = 0.2, initial_convolution_filter_number = 3,
+                 ignore_peak_profile = False):
         self.mass_network_neurons = mass_network_neurons
         self.peak_network_neurons = peak_network_neurons
         self.chromatogram_network_neurons = chromatogram_network_neurons
@@ -24,6 +25,7 @@ class ChromAlignModel:
         self.chromatogram_convolution_dropout_percentage = chromatogram_convolution_dropout_percentage
         self.combined_output_neurons = combined_output_neurons
         self.combined_output_dropout_percentage = combined_output_dropout_percentage
+        self.initial_convolution_filter_number = initial_convolution_filter_number
         self.ignore_peak_profile = ignore_peak_profile
 
     def makeSiameseComponent(self, encoder_model, left_input, right_input):
@@ -36,11 +38,7 @@ class ChromAlignModel:
 
         return comparison
 
-    def buildMassEncoder(self, max_mass_seq_length):
-        mass_input_shape = (max_mass_seq_length,)
-        mass_left_input = Input(mass_input_shape)
-        mass_right_input = Input(mass_input_shape)
-
+    def buildMassEncoder(self, mass_input_shape):
         mass_encoder = Sequential()
         mass_encoder.add(Dense(self.mass_network_neurons, input_shape = mass_input_shape, activation = 'relu'))
         mass_encoder.add(Dropout(self.mass_dropout_percentage))
@@ -48,16 +46,25 @@ class ChromAlignModel:
         mass_encoder.add(Dropout(self.mass_dropout_percentage))
         mass_encoder.add(Dense(self.mass_encoder_neurons, activation = 'relu'))
 
+        return mass_encoder
+        
+    
+    def buildMassSiamese(self, max_mass_seq_length):
+        mass_input_shape = (max_mass_seq_length,)
+        mass_left_input = Input(mass_input_shape)
+        mass_right_input = Input(mass_input_shape)
+
+        mass_encoder = self.buildMassEncoder(mass_input_shape)
+
         mass_comparison = self.makeSiameseComponent(mass_encoder, mass_left_input, mass_right_input)
         mass_prediction = Dense(1, activation = 'sigmoid', name = 'mass_prediction')(mass_comparison)
 
         return mass_left_input, mass_right_input, mass_comparison, mass_prediction
 
+
     def buildPeakEncoder(self):
         peak_input_shape = (None, 1)  # Variable sequence length
         P_in = Input(peak_input_shape)
-        peak_left_input = Input(peak_input_shape)
-        peak_right_input = Input(peak_input_shape)
         
         P = Bidirectional(LSTM(self.peak_network_neurons, return_sequences = True))(P_in)
         P = Dropout(self.peak_dropout_percentage)(P)
@@ -70,30 +77,34 @@ class ChromAlignModel:
         
         peak_encoder = Model(inputs = P_in, outputs = peak_output)
 
+        return peak_encoder
+    
+    def buildPeakSiamese(self):
+        peak_input_shape = (None, 1)  # Variable sequence length
+        peak_left_input = Input(peak_input_shape)
+        peak_right_input = Input(peak_input_shape)
+
+        peak_encoder = self.buildPeakEncoder()
+
         peak_comparison = self.makeSiameseComponent(peak_encoder, peak_left_input, peak_right_input)
         peak_prediction = Dense(1, activation = 'sigmoid', name = 'peak_prediction')(peak_comparison)
 
         return peak_left_input, peak_right_input, peak_comparison, peak_prediction
 
-    def buildChromatogramEncoder(self, segment_length):
-        chromatogram_input_shape = (segment_length, 1)  # One channel input
+    def buildChromatogramEncoder(self, chromatogram_input_shape):
         C_in = Input(chromatogram_input_shape)
-        chromatogram_left_input = Input(chromatogram_input_shape)
-        chromatogram_right_input = Input(chromatogram_input_shape)
         
-        # Segment length of 600, 200, 100, 50, etc
-        initial_filter_number = 3
+        initial_filter_number = self.initial_convolution_filter_number
         for i in range(self.number_of_left_convolution_stacks):
             F1 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F1)
             F1 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-            F1 = MaxPooling1D(3 if i == 0 else 2)(F1)
+            F1 = MaxPooling1D(3 if i == 0 else 2)(F1)  # Segment length of 600, 200, 100, 50, etc
             if (self.chromatogram_convolution_dropout_percentage != 0) and (i != (self.number_of_left_convolution_stacks - 1)):
                 F1 = Dropout(self.chromatogram_convolution_dropout_percentage)(F1)
-        
-        # Segment length of 600, 200, 100, 50, etc
+                
         for i in range(self.number_of_right_convolution_stacks):
             F2 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F2)
-            F2 = MaxPooling1D(3 if i == 0 else 2)(F2)
+            F2 = MaxPooling1D(3 if i == 0 else 2)(F2)  # Segment length of 600, 200, 100, 50, etc
             if (self.chromatogram_convolution_dropout_percentage != 0) and (i != (self.number_of_right_convolution_stacks - 1)):
                 F2 = Dropout(self.chromatogram_convolution_dropout_percentage)(F2)
 
@@ -105,6 +116,15 @@ class ChromAlignModel:
         
         chromatogram_encoder = Model(inputs = C_in, outputs = chromatogram_output)
         
+        return chromatogram_encoder
+
+    def buildChromatogramSiamese(self, segment_length):
+        chromatogram_input_shape = (segment_length, 1)  # One channel input
+        chromatogram_left_input = Input(chromatogram_input_shape)
+        chromatogram_right_input = Input(chromatogram_input_shape)
+
+        chromatogram_encoder = self.buildChromatogramEncoder(chromatogram_input_shape)
+
         chromatogram_comparison = self.makeSiameseComponent(chromatogram_encoder, chromatogram_left_input, chromatogram_right_input)
         chromatogram_prediction = Dense(1, activation = 'sigmoid', name = 'chromatogram_prediction')(chromatogram_comparison)    
         
@@ -113,10 +133,10 @@ class ChromAlignModel:
 
     def buildModel(self, max_mass_seq_length, segment_length):
 
-        mass_left_input, mass_right_input, mass_comparison, mass_prediction = self.buildMassEncoder(max_mass_seq_length)
+        mass_left_input, mass_right_input, mass_comparison, mass_prediction = self.buildMassSiamese(max_mass_seq_length)
         if not self.ignore_peak_profile:
-            peak_left_input, peak_right_input, peak_comparison, peak_prediction = self.buildPeakEncoder()
-        chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction = self.buildChromatogramEncoder(segment_length)
+            peak_left_input, peak_right_input, peak_comparison, peak_prediction = self.buildPeakSiamese()
+        chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction = self.buildChromatogramSiamese(segment_length)
         time_diff = Input((1,))
 
         if self.ignore_peak_profile:
@@ -145,8 +165,6 @@ class SimplifiedPeakEncoderVariant(ChromAlignModel):
     def buildPeakEncoder(self):
         peak_input_shape = (None, 1)  # Variable sequence length
         P_in = Input(peak_input_shape)
-        peak_left_input = Input(peak_input_shape)
-        peak_right_input = Input(peak_input_shape)
         
         P = GRU(self.peak_network_neurons, return_sequences = True)(P_in)
         P = Dropout(self.peak_dropout_percentage)(P)
@@ -159,10 +177,7 @@ class SimplifiedPeakEncoderVariant(ChromAlignModel):
 
         peak_encoder = Model(inputs = P_in, outputs = peak_output)
 
-        peak_comparison = self.makeSiameseComponent(peak_encoder, peak_left_input, peak_right_input)
-        peak_prediction = Dense(1, activation = 'sigmoid', name = 'peak_prediction')(peak_comparison)
-
-        return peak_left_input, peak_right_input, peak_comparison, peak_prediction
+        return peak_encoder
 
 
 def getModelVariant(variant):
@@ -195,5 +210,5 @@ def getModelVariant(variant):
         26: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, ignore_peak_profile = True, number_of_left_convolution_stacks = 5),
         27: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, number_of_left_convolution_stacks = 5)
     }
-    assert variant in switcher, "Model variant does not exist. Check the integer given"
+    assert variant in switcher, "Model variant does not exist. Check the integer input"
     return switcher[variant]

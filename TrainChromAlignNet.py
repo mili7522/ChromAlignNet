@@ -69,8 +69,6 @@ if random_seed_type == 2:
     random_seed = random_seed + int(time.time())
 # if random_seed_type == 3:
     # Load previous
-with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'a') as f:
-    f.write('%d' % random_seed)
 
 
 if train_with_gpu:
@@ -152,6 +150,12 @@ print('Mass spectrum length:', max_mass_seq_length)
 
 
 
+if os.path.isdir(model_path) == False:
+    os.makedirs(model_path)
+
+with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'a') as f:
+    f.write('%d\n' % random_seed)
+
 # Check if existing checkpoints are present - if so then load and resume training from last epoch
 checkpoint_path = os.path.join(model_path, model_name + '-Checkpoint')
 if os.path.isdir(checkpoint_path) and os.listdir(checkpoint_path):
@@ -167,16 +171,12 @@ else:
     initial_epoch = 0
 
 
-
 model.compile(optimizer = Adam(**adam_optimizer_options),
               loss = 'binary_crossentropy',
               metrics = ['accuracy'],
               loss_weights = [1] + [0.2] * (2 if ignore_peak_profile else 3))
 
 #%% Train model
-if os.path.isdir(model_path) == False:
-    os.makedirs(model_path)
-
 if save_history:
     logger = CSVLogger(os.path.join(model_path, model_name) + '-History.csv', separator = ',', append = True)
 else:
@@ -190,18 +190,16 @@ if save_checkpoints:
 else:
     callbacks = [logger] if logger is not None else None
 
-if ignore_peak_profile:
-    training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
-                    data_chrom_seg_1.reshape((samples, segment_length, 1)),
-                    data_chrom_seg_2.reshape((samples, segment_length, 1)),
-                    np.abs(data_time_2 - data_time_1)]
-else:
-    training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
-                    data_peak_1.reshape((samples, max_peak_seq_length, 1)),
-                    data_peak_2.reshape((samples, max_peak_seq_length, 1)),
-                    data_chrom_seg_1.reshape((samples, segment_length, 1)),
-                    data_chrom_seg_2.reshape((samples, segment_length, 1)),
-                    np.abs(data_time_2 - data_time_1)]
+
+training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
+                 data_chrom_seg_1.reshape((samples, segment_length, 1)),
+                 data_chrom_seg_2.reshape((samples, segment_length, 1)),
+                 np.abs(data_time_2 - data_time_1)]
+
+if not ignore_peak_profile:
+    training_data[2:2] = [data_peak_1.reshape((samples, max_peak_seq_length, 1)),
+                          data_peak_2.reshape((samples, max_peak_seq_length, 1))]
+
 
 history = model.fit(training_data,
                     [data_y] * (3 if ignore_peak_profile else 4),
