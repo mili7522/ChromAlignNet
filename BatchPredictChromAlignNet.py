@@ -57,7 +57,7 @@ sys.stdout.flush()
 for repeat in model_repeats:
     for i in model_variants:
 
-        model_file = model_prefix +  + '{:02d}'.format(i) + '-r' + '{:02d}'.format(repeat)     # for submodel
+        model_file = model_prefix + '{:02d}'.format(i) + '-r' + '{:02d}'.format(repeat)     # for submodel
         print('Model used: ', model_file)   #XRW
 
         chrom_align_model = getModelVariant(i)
