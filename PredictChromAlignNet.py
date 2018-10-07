@@ -42,21 +42,11 @@ def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_pr
 
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max = loadData(data_path, info_file, sequence_file)
 
+    keep_index = (pd.notnull(peak_df).all(1)) & (pd.notnull(mass_profile_df).all(1))
     if ignore_negatives and real_groups_available:
         negatives = info_df['Group'] < 0
-        info_df = info_df[~negatives]
-        peak_df = peak_df[~negatives]
-        peak_df_orig = peak_df_orig[~negatives]
-        peak_df_max = peak_df_max[~negatives]
-        mass_profile_df = mass_profile_df[~negatives]
-        info_df.reset_index(inplace = True, drop = False)
-        peak_df.reset_index(inplace = True, drop = True)
-        peak_df_orig.reset_index(inplace = True, drop = True)
-        peak_df_max.reset_index(inplace = True, drop = True)
-        mass_profile_df.reset_index(inplace = True, drop = True)
+        keep_index = keep_index & (~negatives)
         print("Negative index ignored: {}".format(np.sum(negatives)))
-
-    keep_index = (pd.notnull(peak_df).all(1)) & (pd.notnull(mass_profile_df).all(1))
 
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
     print(np.flatnonzero(keep_index == False))
@@ -218,11 +208,12 @@ if __name__ == "__main__":
         printConfusionMatrix(prediction, info_df, comparisons)
 
 
-    plotSpectrumTogether(info_df, peak_df_max, with_real = real_groups_available)
-    if not ignore_negatives:
+    if ignore_negatives:
         plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_df_max[info_df['Group'] >= 0], with_real = real_groups_available)
+    else:
+        plotSpectrumTogether(info_df, peak_df_max, with_real = real_groups_available)
 
-
-    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available)
-    if not ignore_negatives:
-        plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)  # Peaks not normalised
+    if ignore_negatives:
+        plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)
+    else:
+        plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available)

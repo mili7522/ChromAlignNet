@@ -21,7 +21,7 @@ training_options = {
                   'data/2018-05-14-ExtractedPeaks-Breath88-WithMassSlice-All/'   #6
                 ],
     'dataset_for_model': {
-                         'A': [0, 1], 
+                         'A': [0, 1],
                          'B': [0, 1, 2],
                          'C': [0, 1, 3],
                          'D': [0, 1, 4],
@@ -41,8 +41,8 @@ prediction_options = {
     'results_path': 'results',
 
     'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-B-02-r01',
-    'data_path': training_options['datasets'][5],
+    'model_file': 'ChromAlignNet-D-02-r04',
+    'data_path': training_options['datasets'][2],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv'
 }
