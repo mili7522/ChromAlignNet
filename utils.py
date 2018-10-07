@@ -132,14 +132,11 @@ def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, ran
             d_x1_times = info_df.loc[x1[different_group]]['peakMaxTime'].values
             d_x2_times = info_df.loc[x2[different_group]]['peakMaxTime'].values
             d_time_diff = np.abs(d_x1_times - d_x2_times)
-            d_time_diff = 1/(d_time_diff + 1E-5)
-            d_time_diff = d_time_diff / np.sum(d_time_diff)
-            p_non_zero = d_time_diff > 0
-            d_time_diff = d_time_diff[p_non_zero]
-            different_group = different_group[p_non_zero]
+            d_time_diff_inv = 1/(d_time_diff + 1E-4) ** 2
+            p = d_time_diff_inv / np.sum(d_time_diff_inv)
             # Select a subset of the cases where groups are different, to keep positive and negative training examples balanced
-            different_group = np.random.choice(different_group, size = len(same_group), replace = False, p = d_time_diff)
-
+            different_group = np.random.choice(different_group, size = len(same_group), replace = False, p = p)
+            
             selected_for_different_group[different_group] = 1
             new_x1.extend(x1[same_group])
             new_x2.extend(x2[same_group])

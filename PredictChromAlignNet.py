@@ -12,32 +12,33 @@ from model_definition import getModelVariant
 from parameters import prediction_options
 
 
-# Load parameters
+### Load parameters
+### These parameters are loaded here even for any batch prediction scripts
 ignore_negatives = prediction_options.get('ignore_negatives')
 time_cutoff = prediction_options.get('time_cutoff')
+real_groups_available = prediction_options.get('real_groups_available')
+info_file = prediction_options.get('info_file')
+sequence_file = prediction_options.get('sequence_file')
+results_path = prediction_options.get('results_path')
+###
+
+### These parameter are loaded individually in any batch prediction scripts, since they may change per model / data source
 predictions_save_name = prediction_options.get('predictions_save_name')
 model_path = prediction_options.get('model_path')
 model_file = prediction_options.get('model_file')
 data_path = prediction_options.get('data_path')
-info_file = prediction_options.get('info_file')
-sequence_file = prediction_options.get('sequence_file')
-results_path = prediction_options.get('results_path')
 
 
 model_variant = int(model_file.split('-')[2])
 chrom_align_model = getModelVariant(model_variant)
-ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile')
+ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile') #
 
-
-if os.path.isfile(os.path.join(data_path, info_file)):
-    real_groups_available = True
-else:
-    info_file = 'PeakData.csv'
-    real_groups_available = False
+if os.path.isdir(results_path) == False:
+            os.makedirs(results_path)
 
 
 ### Load peak and mass slice profiles
-def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_profile = ignore_peak_profile):
+def prepareDataForPrediction(data_path, ignore_peak_profile):
     loadTime = time.time()
 
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max = loadData(data_path, info_file, sequence_file)
@@ -66,7 +67,7 @@ def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_pr
     data_mass_spectrum_1 = mass_profile_df.loc[x1].values
     data_mass_spectrum_2 = mass_profile_df.loc[x2].values
     data_chrom_seg_1 = chrom_seg_df.loc[x1].values
-    data_chrom_seg_1 = chrom_seg_df.loc[x2].values
+    data_chrom_seg_2 = chrom_seg_df.loc[x2].values
 
     samples, max_peak_seq_length = data_peak_1.shape
     _, max_mass_seq_length = data_mass_spectrum_1.shape
@@ -83,20 +84,17 @@ def prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_pr
     sys.stdout.flush()   # XRW
 
 
-    if ignore_peak_profile:
-        prediction_data = [data_mass_spectrum_1, data_mass_spectrum_2,
-                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
-                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
-                            data_time_diff]
-    else:
-        prediction_data = [data_mass_spectrum_1, data_mass_spectrum_2,
-                            data_peak_1.reshape((samples, max_peak_seq_length, 1)),
-                            data_peak_2.reshape((samples, max_peak_seq_length, 1)),
-                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
-                            data_chrom_seg_1.reshape((samples, segment_length, 1)),
-                            data_time_diff]
+    prediction_data = [data_mass_spectrum_1, data_mass_spectrum_2,
+                        data_chrom_seg_1.reshape((samples, segment_length, 1)),
+                        data_chrom_seg_2.reshape((samples, segment_length, 1)),
+                        data_time_diff]
+
+    if not ignore_peak_profile:  # Insert peak data
+        prediction_data[2:2] = [data_peak_1.reshape((samples, max_peak_seq_length, 1)),
+                                data_peak_2.reshape((samples, max_peak_seq_length, 1))]
 
     return prediction_data, comparisons, info_df, peak_df_orig, peak_df_max
+
 
 def runPrediction(prediction_data, model_path, model_file):
     #%% Predict
@@ -122,17 +120,17 @@ def getDistances(prediction):
     return distances
     
 
-def getDistanceMatrix(comparisons, peaks, prediction, clip = 10):
+def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10):
     distances = getDistances(prediction)
     
-    distance_matrix = np.empty((peaks, peaks))
+    distance_matrix = np.empty((number_of_peaks, number_of_peaks))
     distance_matrix.fill(clip)  # Clip value
     
     for i, (x1, x2) in enumerate(comparisons):
         distance_matrix[x1, x2] = min(distances[i], clip)
         distance_matrix[x2, x1] = min(distances[i], clip)
     
-    for i in range(peaks):
+    for i in range(number_of_peaks):
         distance_matrix[i,i] = 0
     
     return distance_matrix
@@ -187,11 +185,9 @@ def printConfusionMatrix(prediction, info_df, comparisons):
 ####
 
 if __name__ == "__main__":
-    prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, info_file, sequence_file)
+    prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, ignore_peak_profile)
     prediction = runPrediction(prediction_data, model_path, model_file)
     if predictions_save_name is not None:
-        if os.path.isdir(results_path) == False:
-            os.makedirs(results_path)
         predictions_df = pd.DataFrame(np.concatenate((comparisons, prediction), axis = 1), columns = ['x1', 'x2', 'prediction'])
         predictions_df['x1'] = predictions_df['x1'].astype(int)
         predictions_df['x2'] = predictions_df['x2'].astype(int)

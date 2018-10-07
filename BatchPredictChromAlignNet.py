@@ -15,28 +15,21 @@ from model_definition import getModelVariant
 
 
 #%% Options
-
-ignore_negatives = prediction_options.get('ignore_negatives')
-time_cutoff = prediction_options.get('time_cutoff')
-results_path = prediction_options.get('results_path')
 model_path = prediction_options.get('model_path')
-info_file = prediction_options.get('info_file')
-sequence_file = prediction_options.get('sequence_file')
-
 data_paths = training_options.get('datasets')
-model_files = 'ChromAlignNet-A-'
+model_prefix = 'ChromAlignNet-A-'
+results_path = prediction_options.get('results_path')
+real_groups_available = prediction_options.get('real_groups_available')
 
 model_repeats = batch_prediction_options.get('model_repeats')
 model_variants = batch_prediction_options.get('model_variants')
 model_names = {1:'A', 2:'B', 3:'C', 4:'D', 5:'E', 6:'F', 7:'G'}   # XRW
 
-if os.path.isdir(results_path) == False:
-    os.makedirs(results_path)
 
 j = int(sys.argv[1])
 
 save_names = batch_prediction_options.get('save_names')
-save_name = os.path.join(results_path,save_names[j])
+save_name = os.path.join(results_path, save_names[j])
 
 data_path = data_paths[j]
 
@@ -61,24 +54,16 @@ sys.stdout.flush()
 
 
 #%% Predict
-if os.path.isfile(os.path.join(data_path, info_file)):
-    real_groups_available = True
-else:
-    info_file = 'PeakData.csv'
-    real_groups_available = False
-
-
-
 for repeat in model_repeats:
     for i in model_variants:
 
-        model_file = model_files + '{:02d}'.format(i) + '-r' + '{:02d}'.format(repeat)     # for submodel
+        model_file = model_prefix +  + '{:02d}'.format(i) + '-r' + '{:02d}'.format(repeat)     # for submodel
         print('Model used: ', model_file)   #XRW
 
         chrom_align_model = getModelVariant(i)
         ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile')
 
-        prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, info_file, sequence_file, ignore_peak_profile = ignore_peak_profile)
+        prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, ignore_peak_profile)
         
         # model_name_list.append(model_names[i+1])   # XRW -- for full models
         model_variant_list.append(i)   # XRW -- for sub-models
@@ -95,21 +80,17 @@ for repeat in model_repeats:
         distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10)
         groups = assignGroups(distance_matrix, threshold = 2)
         
-        if real_groups_available:
-            real_groups = getRealGroupAssignments(info_df)
-        
         print('Time to cluster:', round((time.time() - clusterTime)/60, 2), 'min')
         
         #%% Plot spectrum and peaks
         alignTimes(groups, info_df, 'AlignedTime')
         if real_groups_available:
+            real_groups = getRealGroupAssignments(info_df)
             alignTimes(real_groups, info_df, 'RealAlignedTime')
-        
-        if real_groups_available:
             confusion_matrices.append(printConfusionMatrix(prediction, info_df, comparisons))
         
 
-    cm_df = pd.DataFrame(confusion_matrices, columns = ['True Positives', 'False Positives', 'False Positives - Ignore Neg Indices'])
+    cm_df = pd.DataFrame(confusion_matrices, columns = ['True Positives', 'False Positives', 'False Positives - Ignore Neg Idx'])
     df = pd.concat([cm_df, pd.DataFrame(prediction_times, columns = ['Prediction Times'])], axis = 1)
     # df['Model Name']
     df['Model Variant'] = model_variant_list
