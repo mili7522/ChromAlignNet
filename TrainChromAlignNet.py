@@ -7,7 +7,7 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
 from tensorflow.keras.optimizers import Adam
-from utils import loadData, printShapes, getChromatographSegmentDf, generateCombinationIndices
+from utils import loadData, getChromatographSegmentDf, generateCombinationIndices
 from model_definition import getModelVariant
 from parameters import training_options
 
@@ -67,9 +67,10 @@ data_paths = list( datasets[i] for i in dataset_for_model[dataset_selection] )
 random_seed = int(ord(dataset_selection) * 1E4 + model_variant * 1E2 + repetition)
 if random_seed_type == 2:
     random_seed = random_seed + int(time.time())
-# TODO
-# if random_seed_type == 3:
-    # Load previous
+if random_seed_type == 3:
+    with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'r') as f:
+        lines = f.readlines()
+        random_seed = lines[-1][:-1]  # Ignore last \n character
 
 
 if train_with_gpu:
@@ -99,19 +100,19 @@ for data_path in data_paths:
     keep_index = (pd.notnull(mass_profile_df).all(1)) & (info_df['Group'] >= 0)
     if not ignore_peak_profile:
         keep_index = keep_index & (pd.notnull(peak_df).all(1))
-    info_df = info_df[keep_index]
-    peak_df = peak_df[keep_index]
-    mass_profile_df = mass_profile_df[keep_index]
+    # info_df = info_df[keep_index]
+    # peak_df = peak_df[keep_index]
+    # mass_profile_df = mass_profile_df[keep_index]
 
-    info_df.reset_index(inplace = True, drop = True)
-    peak_df.reset_index(inplace = True, drop = True)
-    mass_profile_df.reset_index(inplace = True, drop = True)
+    # info_df.reset_index(inplace = True, drop = True)
+    # peak_df.reset_index(inplace = True, drop = True)
+    # mass_profile_df.reset_index(inplace = True, drop = True)
 
     chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
 
     prev_len = len(data_y)
-    x1, x2, y = generateCombinationIndices(info_df, time_cutoff = None, return_y = True, random_seed = random_seed)
+    x1, x2, y = generateCombinationIndices(info_df[keep_index], time_cutoff = None, return_y = True, random_seed = random_seed)
     data_time_1.extend(info_df.loc[x1]['peakMaxTime'])
     data_time_2.extend(info_df.loc[x2]['peakMaxTime'])
     if not ignore_peak_profile:
@@ -130,7 +131,7 @@ shuffle_index = np.random.permutation(len(data_time_1))
 data_time_1 = np.array(data_time_1)[shuffle_index]
 data_time_2 = np.array(data_time_2)[shuffle_index]
 if not ignore_peak_profile:
-    data_peak_1 = pd.concat(data_peak_1, axis = 0)  # Use pd to concat since the DataSeries might be of different lengths
+    data_peak_1 = pd.concat(data_peak_1, axis = 0)
     data_peak_1.fillna(0, inplace = True)
     data_peak_1 = data_peak_1.values[shuffle_index]
     data_peak_2 = pd.concat(data_peak_2, axis = 0)
@@ -202,7 +203,7 @@ training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
                  data_chrom_seg_2.reshape((samples, segment_length, 1)),
                  np.abs(data_time_2 - data_time_1)]
 
-if not ignore_peak_profile:
+if not ignore_peak_profile:  # Insert peak data
     training_data[2:2] = [data_peak_1.reshape((samples, max_peak_seq_length, 1)),
                           data_peak_2.reshape((samples, max_peak_seq_length, 1))]
 
