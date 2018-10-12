@@ -79,8 +79,8 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
     print('Chromatogram segment length:', segment_length)
 
     print('Time to load and generate samples:', round((time.time() - loadTime)/60, 2), 'min')
-    print('\n')   # XRW
-    print('===============\nPredictions:\n---')   # XRW
+    #print('\n')   
+    print('===============\nPredictions:')   # XRW
     sys.stdout.flush()   # XRW
 
 
@@ -96,7 +96,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
     return prediction_data, comparisons, info_df, peak_df_orig, peak_df_max
 
 
-def runPrediction(prediction_data, model_path, model_file):
+def runPrediction(prediction_data, model_path, model_file﻿, verbose = 1):
     #%% Predict
     K.clear_session()
     predict_time = time.time()
@@ -105,7 +105,7 @@ def runPrediction(prediction_data, model_path, model_file):
     print(loading)
     model = load_model(loading)
 
-    prediction = model.predict(prediction_data, verbose = 1)
+    prediction = model.predict(prediction_data, verbose = verbose)
 
     prediction = prediction[0]  # Only take the main outcome
 
