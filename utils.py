@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 import itertools
 import os
 
-def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'WholeSequence.csv'):
+def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'WholeSequence.csv', take_chromatogram_log = True):
 
     info_df = pd.read_csv(os.path.join(data_path, info_file), index_col = 0)
+    info_df.dropna(axis = 1, how = 'all', inplace = True)  # Some empty columns are sometimes imported. Drop these
     chromatogram_df = pd.read_csv(os.path.join(data_path, sequence_file), index_col = 0)
     
     ### Load peak and mass spectra
@@ -57,8 +58,9 @@ def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'W
     mass_profile_df = mass_profile_df.transpose()
 
 
-    idx = chromatogram_df > 0
-    chromatogram_df[idx] = np.log2(chromatogram_df[idx])
+    if take_chromatogram_log:
+        idx = chromatogram_df > 0
+        chromatogram_df[idx] = np.log2(chromatogram_df[idx])
     chromatogram_df = chromatogram_df.transpose()
     
     # Index starts off as all 0s due to concatonation and transposing. Resets to consecutive integers

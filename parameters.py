@@ -41,8 +41,8 @@ prediction_options = {
     'results_path': 'results',
 
     'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-G-02-r03',
-    'data_path': training_options['datasets'][5],
+    'model_file': 'ChromAlignNet-D-02-r04',
+    'data_path': training_options['datasets'][4],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
     'real_groups_available': True
