@@ -23,14 +23,14 @@ real_groups_available = prediction_options.get('real_groups_available')
 
 model_repeats = batch_prediction_options.get('model_repeats')
 model_variants = batch_prediction_options.get('model_variants')
-﻿model_names =  batch_prediction_options.get('model_names')  
+model_names =  batch_prediction_options.get('model_names')  
 
-﻿verbose_prediction = batch_prediction_options.get('verbose_prediction') 
+verbose_prediction = batch_prediction_options.get('verbose_prediction') 
 
 
 j = int(sys.argv[1])
 
-﻿# Second system input of repetition number, thus need to modify the save_name variable
+# Second system input of repetition number, thus need to modify the save_name variable
 save_names = batch_prediction_options.get('save_names')
 if len(sys.argv) > 2:
     repeat = int(sys.argv[2])
@@ -47,7 +47,7 @@ data_path = data_paths[j]
 #%% Load and pre-process data
 confusion_matrices = []
 prediction_times = []
-﻿model_fullname_list = []  
+model_fullname_list = []  
 #model_variant_list = []      # no longer needed
 #model_name_list = []         # no longer needed
 
@@ -65,7 +65,7 @@ sys.stdout.flush()
 
 
 #%% Predict
-﻿# changed the order of the loops. variant first, so the data only need to be loaded once for the variant. model name, and then the repeats. 
+# changed the order of the loops. variant first, so the data only need to be loaded once for the variant. model name, and then the repeats. 
 for i in model_variants:
     print('\n\n')     # this is just so the log file is nice   
     print('===============\nFor model variant', i)   

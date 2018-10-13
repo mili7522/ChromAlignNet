@@ -96,7 +96,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
     return prediction_data, comparisons, info_df, peak_df_orig, peak_df_max
 
 
-def runPrediction(prediction_data, model_path, model_file﻿, verbose = 1):
+def runPrediction(prediction_data, model_path, model_file, verbose = 1):
     #%% Predict
     K.clear_session()
     predict_time = time.time()

@@ -15,7 +15,7 @@ from parameters import training_options
 epochs = training_options.get('epochs')
 batch_size = training_options.get('batch_size')
 validation_split = training_options.get('validation_split')
-﻿verbose_training = training_options.get('verbose_training')  
+verbose_training = training_options.get('verbose_training')  
 adam_optimizer_options = training_options.get('adam_optimizer_options')
 train_with_gpu = training_options.get('train_with_gpu')
 random_seed_type = training_options.get('random_seed_type')
@@ -155,7 +155,7 @@ if not ignore_peak_profile:
     print('Max peak length:', max_peak_seq_length)
 print('Chromatogram segment length:', segment_length)
 print('Mass spectrum length:', max_mass_seq_length)
-﻿sys.stdout.flush() 
+sys.stdout.flush() 
 
 
 if os.path.isdir(model_path) == False:
@@ -214,7 +214,7 @@ history = model.fit(training_data,
                     epochs = epochs,
                     batch_size = batch_size,
                     validation_split = validation_split,
-﻿                    verbose = verbose_training,   
+                    verbose = verbose_training,   
                     initial_epoch = initial_epoch,
                     callbacks = callbacks)
 
