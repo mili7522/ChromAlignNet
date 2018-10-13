@@ -33,7 +33,7 @@ sequence_file = training_options.get('sequence_file')
 
 # Modify the model name for different data sources, model variants and repetitions
 if len(sys.argv) > 1:
-    assert sys.argv[1] in ('A', 'B', 'C', 'D', 'E', 'F', 'G'), "Dataset selection needs to be a letter between A and G"
+    assert sys.argv[1] in dataset_for_model, "Dataset selection needs to be a letter between A and G"
     dataset_selection = sys.argv[1]
 else:
     dataset_selection = 'A'

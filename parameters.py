@@ -43,7 +43,7 @@ prediction_options = {
 
     'model_path': 'SavedModels/',
     'model_file': 'ChromAlignNet-D-02-r04',
-    'data_path': training_options['datasets'][4],
+    'data_path': training_options['datasets'][3],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
     'real_groups_available': True
@@ -57,5 +57,5 @@ batch_prediction_options = {
     'model_repeats': range(1,2),
     'model_names': ['D'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
     'model_variants': [20, 21, 26], # range(1, 28),
-    'verbose_prediction' : 0     
+    'verbose_prediction' : 1
 }

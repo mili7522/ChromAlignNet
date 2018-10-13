@@ -34,7 +34,7 @@ chrom_align_model = getModelVariant(model_variant)
 ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile') #
 
 if os.path.isdir(results_path) == False:
-            os.makedirs(results_path)
+    os.makedirs(results_path)
 
 
 ### Load peak and mass slice profiles

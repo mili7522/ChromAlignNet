@@ -201,14 +201,13 @@ def getModelVariant(variant):
         17: ChromAlignModel(number_of_left_convolution_stacks = 3),
         18: ChromAlignModel(number_of_right_convolution_stacks = 4),
         19: ChromAlignModel(number_of_right_convolution_stacks = 2),
-        20: ChromAlignModel(chromatogram_encoder_neurons = 5, ignore_peak_profile = True),
-        21: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_encoder_neurons = 5),
-        22: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, ignore_peak_profile = True),
-        23: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30),
-        24: ChromAlignModel(chromatogram_encoder_neurons = 5, ignore_peak_profile = True, number_of_left_convolution_stacks = 5),
-        25: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_encoder_neurons = 5, number_of_left_convolution_stacks = 5),
-        26: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, ignore_peak_profile = True, number_of_left_convolution_stacks = 5),
-        27: SimplifiedPeakEncoderVariant(peak_network_neurons = 32, chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 30, number_of_left_convolution_stacks = 5)
+
+        20: ChromAlignModel(mass_encoder_neurons = 5, ignore_peak_profile = True),  # 2 + 8
+        21: ChromAlignModel(mass_dropout_percentage = 0.5, mass_encoder_neurons = 20, ignore_peak_profile = True),  # 2 + 9
+        22: ChromAlignModel(chromatogram_encoder_neurons = 5, ignore_peak_profile = True),  # 2 + 11
+        23: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 20, ignore_peak_profile = True),  # 2 + 12
+        24: ChromAlignModel(number_of_left_convolution_stacks = 3, ignore_peak_profile = True),  # 2 + 17
+        25: ChromAlignModel(number_of_right_convolution_stacks = 2, ignore_peak_profile = True)  # 2 + 19
     }
     assert variant in switcher, "Model variant does not exist. Check the integer input"
     return switcher[variant]
