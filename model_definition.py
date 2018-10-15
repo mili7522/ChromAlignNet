@@ -207,7 +207,14 @@ def getModelVariant(variant):
         22: ChromAlignModel(chromatogram_encoder_neurons = 5, ignore_peak_profile = True),  # 2 + 11
         23: ChromAlignModel(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 20, ignore_peak_profile = True),  # 2 + 12
         24: ChromAlignModel(number_of_left_convolution_stacks = 3, ignore_peak_profile = True),  # 2 + 17
-        25: ChromAlignModel(number_of_right_convolution_stacks = 2, ignore_peak_profile = True)  # 2 + 19
+        25: ChromAlignModel(number_of_right_convolution_stacks = 2, ignore_peak_profile = True),  # 2 + 19
+        
+        ﻿26: SimplifiedPeakEncoderVariant(mass_encoder_neurons = 5),    # 3 + 8
+        27: SimplifiedPeakEncoderVariant(mass_dropout_percentage = 0.5, mass_encoder_neurons = 20),    # 3 + 9
+        28: SimplifiedPeakEncoderVariant(chromatogram_encoder_neurons = 5),    # 3 + 11
+        29: SimplifiedPeakEncoderVariant(chromatogram_dropout_percentage = 0.5, chromatogram_encoder_neurons = 20),    # 3 + 12
+        30: SimplifiedPeakEncoderVariant(number_of_left_convolution_stacks = 3),    # 3 + 17
+        31: SimplifiedPeakEncoderVariant(number_of_right_convolution_stacks = 2)    # 3 + 19
     }
     assert variant in switcher, "Model variant does not exist. Check the integer input"
     return switcher[variant]
