@@ -108,7 +108,7 @@ for i in model_variants:
             sys.stdout.flush()  
             
 
-        cm_df = pd.DataFrame(confusion_matrices, columns = ['True Positives', 'False Positives', 'False Positives - Ignore Neg Idx'])
+        cm_df = pd.DataFrame(confusion_matrices, columns = ['True Positives', 'False Positives - Ignore Neg Idx', 'False Positives'])
         df = pd.concat([cm_df, pd.DataFrame(prediction_times, columns = ['Prediction Times'])], axis = 1)
         # df['Model Name']   # no longer needed
         # df['Model Variant'] = model_variant_list   # no longer needed
