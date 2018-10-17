@@ -223,7 +223,7 @@ def plotSpectrumTogether(info_df, maxValues, with_real = False, save_name = None
     
     if save_name is not None:
         plt.savefig(save_name + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
-        plt.savefig(save_name + '.eps', format = 'eps', bbox_inches = 'tight')
+        plt.savefig(save_name + '.eps', dpi = 500, format = 'eps', bbox_inches = 'tight')
     else:
         plt.show()
 
@@ -283,6 +283,6 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None):
     
     if save_name is not None:
         plt.savefig(save_name + '.png', dpi = 250, format = 'png', bbox_inches = 'tight')
-        plt.savefig(save_name + '.eps', format = 'eps', bbox_inches = 'tight')
+        plt.savefig(save_name + '.eps', dpi = 250, format = 'eps', bbox_inches = 'tight')
     else:
         plt.show()
