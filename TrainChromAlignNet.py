@@ -29,6 +29,7 @@ datasets = training_options.get('datasets')
 dataset_for_model = training_options.get('dataset_for_model')
 info_file = training_options.get('info_file')
 sequence_file = training_options.get('sequence_file')
+ignore_negatives = training_options.get('ignore_negatives')
 
 
 # Modify the model name for different data sources, model variants and repetitions
@@ -98,7 +99,9 @@ for data_path in data_paths:
     info_df, peak_df, mass_profile_df, chromatogram_df, _, _ = loadData(data_path, info_file, sequence_file)
 
     # Remove null rows and negative indexed groups
-    keep_index = (pd.notnull(mass_profile_df).all(1)) & (info_df['Group'] >= 0)
+    keep_index = (pd.notnull(mass_profile_df).all(1))
+    if not ignore_negatives:
+        keep_index = keep_index & (info_df['Group'] >= 0)
     if not ignore_peak_profile:
         keep_index = keep_index & (pd.notnull(peak_df).all(1))
     # info_df = info_df[keep_index]

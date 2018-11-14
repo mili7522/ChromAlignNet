@@ -31,6 +31,7 @@ training_options = {
                          'G': [0, 1, 3, 6]
                          },
 
+    'ignore_negatives': False,  # Ignore groups assigned with a negative index?
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv'
 }

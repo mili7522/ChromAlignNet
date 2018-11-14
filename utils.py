@@ -124,6 +124,7 @@ def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, ran
         selected_for_different_group = np.zeros((len(x1)), dtype = bool)  # Avoid repetitions in the training set
         groups = info_df['Group'].unique()
         for group in groups:
+            if group < 0: continue
             x1_in_group = (x1_group == group).values
             x2_in_group = (x2_group == group).values
             same_group = x1_in_group & x2_in_group
