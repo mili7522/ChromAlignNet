@@ -100,7 +100,7 @@ for data_path in data_paths:
 
     # Remove null rows and negative indexed groups
     keep_index = (pd.notnull(mass_profile_df).all(1))
-    if not ignore_negatives:
+    if ignore_negatives:
         keep_index = keep_index & (info_df['Group'] >= 0)
     if not ignore_peak_profile:
         keep_index = keep_index & (pd.notnull(peak_df).all(1))
