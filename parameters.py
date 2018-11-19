@@ -28,7 +28,8 @@ training_options = {
                          'D': [0, 1, 4],
                          'E': [0, 1, 3, 4],
                          'F': [0, 1, 3, 5],
-                         'G': [0, 1, 3, 6]
+                         'G': [0, 1, 3, 6],
+                         'H': [0, 1, 2, 3, 4, 5, 6]
                          },
 
     'ignore_negatives': False,  # Ignore groups assigned with a negative index?
@@ -55,8 +56,8 @@ prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(p
 
 batch_prediction_options = {
     'save_names': ["ModelTests-On{}.csv".format(x.split('-')[4]) for x in training_options['datasets']],
-    'model_repeats': range(1,2),
-    'model_names': ['D'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
-    'model_variants': [20, 21, 26], # range(1, 28),
-    'verbose_prediction' : 1
+    'model_repeats': range(1,11),
+    'model_names': ['G'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
+    'model_variants': [1], #[20, 21, 26], # range(1, 28),
+    'verbose_prediction' : 0
 }
