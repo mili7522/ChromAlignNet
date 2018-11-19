@@ -51,7 +51,7 @@ prediction_options = {
     'real_groups_available': True
 }
 
-prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(prediction_options['results_path'], prediction_options['model_file'], prediction_options['data_path'].split('-')[4])
+prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(prediction_options['results_path'], prediction_options['model_file'], prediction_options['data_path'].split('-')[1])
 
 
 batch_prediction_options = {
