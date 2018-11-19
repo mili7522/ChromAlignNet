@@ -13,13 +13,13 @@ training_options = {
     'model_name': 'ChromAlignNet',
 
 
-    'datasets': [ 'data/2018-04-22-ExtractedPeaks-Air103-WithMassSlice/',        #0
-                  'data/2018-04-30-ExtractedPeaks-Air115-WithMassSlice/',        #1
-                  'data/2018-04-30-ExtractedPeaks-Air143-WithMassSlice/',        #2
-                  'data/2018-05-01-ExtractedPeaks-Breath103-WithMassSlice/',     #3
-                  'data/2018-05-01-ExtractedPeaks-Breath115-WithMassSlice/',     #4
-                  'data/2018-05-14-ExtractedPeaks-Breath73-WithMassSlice-All/',  #5
-                  'data/2018-05-14-ExtractedPeaks-Breath88-WithMassSlice-All/'   #6
+    'datasets': [ 'data/training-Air103-WithMassSlice/',        #0
+                  'data/training-Air115-WithMassSlice/',        #1
+                  'data/training-Air143-WithMassSlice/',        #2
+                  'data/training-Breath103-WithMassSlice/',     #3
+                  'data/training-Breath115-WithMassSlice/',     #4
+                  'data/training-Breath73-WithMassSlice-All/',  #5
+                  'data/training-Breath88-WithMassSlice-All/'   #6
                 ],
     'dataset_for_model': {
                          'A': [0, 1],
@@ -55,7 +55,7 @@ prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(p
 
 
 batch_prediction_options = {
-    'save_names': ["ModelTests-On{}.csv".format(x.split('-')[4]) for x in training_options['datasets']],
+    'save_names': ["ModelTests-On{}.csv".format(x.split('-')[1]) for x in training_options['datasets']],
     'model_repeats': range(1,11),
     'model_names': ['G'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
     'model_variants': [1], #[20, 21, 26], # range(1, 28),
