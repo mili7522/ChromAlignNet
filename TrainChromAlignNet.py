@@ -187,7 +187,7 @@ model.compile(optimizer = Adam(**adam_optimizer_options),
               metrics = ['accuracy'],
               loss_weights = [1] + [0.2] * (2 if ignore_peak_profile else 3))
 
-#%% Train model
+### Train model
 if save_history:
     logger = CSVLogger(os.path.join(model_path, model_name) + '-History.csv', separator = ',', append = True)
 else:

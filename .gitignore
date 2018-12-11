@@ -1,7 +1,6 @@
 SavedModels/
 data/
 results/
-.vscode/settings.json
+.vscode/
 __pycache__/
-TrainClassifierSiameseCN-MultiFolderTraining.py
-FitSiameseCN-Batch.py
+temp/

@@ -41,7 +41,7 @@ if os.path.isdir(results_path) == False:
 def prepareDataForPrediction(data_path, ignore_peak_profile):
     loadTime = time.time()
 
-    info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max = loadData(data_path, info_file, sequence_file)
+    info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file)
 
     keep_index = (pd.notnull(peak_df).all(1)) & (pd.notnull(mass_profile_df).all(1))
     if ignore_negatives and real_groups_available:
@@ -54,7 +54,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
 
     chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
 
-    #%% Generate data combinations
+    ### Generate data combinations
     comparisons = generateCombinationIndices(info_df[keep_index], time_cutoff = time_cutoff, return_y = False)
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
@@ -93,11 +93,11 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
         prediction_data[2:2] = [data_peak_1.reshape((samples, max_peak_seq_length, 1)),
                                 data_peak_2.reshape((samples, max_peak_seq_length, 1))]
 
-    return prediction_data, comparisons, info_df, peak_df_orig, peak_df_max
+    return prediction_data, comparisons, info_df, peak_df_orig, peak_intensity
 
 
 def runPrediction(prediction_data, model_path, model_file, verbose = 1):
-    #%% Predict
+    ### Predict
     K.clear_session()
     predict_time = time.time()
     ### Load model
@@ -114,7 +114,7 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1):
     return prediction
 
 
-#%% Group and cluster
+### Group and cluster
 def getDistances(prediction):
     distances = 1 / prediction
     return distances
@@ -185,7 +185,7 @@ def printConfusionMatrix(prediction, info_df, comparisons):
 ####
 
 if __name__ == "__main__":
-    prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, ignore_peak_profile)
+    prediction_data, comparisons, info_df, peak_df_orig, peak_intensity = prepareDataForPrediction(data_path, ignore_peak_profile)
     prediction = runPrediction(prediction_data, model_path, model_file)
     if predictions_save_name is not None:
         predictions_df = pd.DataFrame(np.concatenate((comparisons, prediction), axis = 1), columns = ['x1', 'x2', 'prediction'])
@@ -205,9 +205,9 @@ if __name__ == "__main__":
 
 
     if ignore_negatives:
-        plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_df_max[info_df['Group'] >= 0], with_real = real_groups_available)
+        plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_intensity[info_df['Group'] >= 0], with_real = real_groups_available)
     else:
-        plotSpectrumTogether(info_df, peak_df_max, with_real = real_groups_available)
+        plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available)
 
     if ignore_negatives:
         plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)

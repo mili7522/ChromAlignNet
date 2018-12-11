@@ -14,7 +14,7 @@ from parameters import prediction_options, training_options, batch_prediction_op
 from model_definition import getModelVariant
 
 
-#%% Options
+### Options
 model_path = prediction_options.get('model_path')
 data_paths = training_options.get('datasets')
 model_prefix = 'ChromAlignNet-'
@@ -44,7 +44,7 @@ else:
 data_path = data_paths[j]
 
 
-#%% Load and pre-process data
+### Load and pre-process data
 confusion_matrices = []
 prediction_times = []
 model_fullname_list = []  
@@ -64,7 +64,7 @@ print(save_name)
 sys.stdout.flush()
 
 
-#%% Predict
+### Predict
 # changed the order of the loops. variant first, so the data only need to be loaded once for the variant. model name, and then the repeats. 
 for i in model_variants:
     print('\n\n')     # this is just so the log file is nice   
@@ -73,7 +73,7 @@ for i in model_variants:
     chrom_align_model = getModelVariant(i)
     ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile')
     
-    prediction_data, comparisons, info_df, peak_df_orig, peak_df_max = prepareDataForPrediction(data_path, ignore_peak_profile)
+    prediction_data, comparisons, info_df, peak_df_orig, peak_intensity = prepareDataForPrediction(data_path, ignore_peak_profile)
             
     for name in model_names:
         for repeat in model_repeats:
@@ -91,7 +91,7 @@ for i in model_variants:
             print('Time to predict:', round((time.time() - predict_time)/60, 2), 'min')
             prediction_times.append(round((time.time() - predict_time)/60, 2))
         
-            #%% Group and cluster
+            ### Group and cluster
             
             clusterTime = time.time()
             distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10)
@@ -99,7 +99,7 @@ for i in model_variants:
             
             print('Time to cluster:', round((time.time() - clusterTime)/60, 2), 'min')
             
-            #%% Plot spectrum and peaks    # XRW 08-10: I don't think this is about plot spectrum
+            ### Plot spectrum and peaks    # XRW 08-10: I don't think this is about plot spectrum
             alignTimes(groups, info_df, 'AlignedTime')
             if real_groups_available:
                 real_groups = getRealGroupAssignments(info_df)

@@ -10,7 +10,7 @@ info_file = prediction_options.get('info_file')
 sequence_file = prediction_options.get('sequence_file')
 real_groups_available = prediction_options.get('real_groups_available')
 
-info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_df_max = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
+info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
 
 def plotAlignments():
     prediction_file = prediction_options.get('predictions_save_name')
@@ -25,7 +25,7 @@ def plotAlignments():
         alignTimes(real_groups, info_df, 'RealAlignedTime')
         printConfusionMatrix(prediction, info_df, comparisons)
 
-    plotSpectrumTogether(info_df, peak_df_max, with_real = real_groups_available, save_name = None)
+    plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
     plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = None)
 
 
