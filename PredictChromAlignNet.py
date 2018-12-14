@@ -96,7 +96,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
     return prediction_data, comparisons, info_df, peak_df_orig, peak_intensity
 
 
-def runPrediction(prediction_data, model_path, model_file, verbose = 1):
+def runPrediction(prediction_data, model_path, model_file, verbose = 1, predictions_save_name = None, comparisons = None):
     ### Predict
     K.clear_session()
     predict_time = time.time()
@@ -106,6 +106,16 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1):
     model = load_model(loading)
 
     prediction = model.predict(prediction_data, verbose = verbose)
+    
+    if predictions_save_name is not None and comparisons is not None:
+        predictions_df = pd.DataFrame(np.concatenate((comparisons, prediction), axis = 1))
+        if prediction.shape[1] == 3:
+            predictions_df.columns = ['x1', 'x2', 'probability', 'prob_mass', 'prob_peak', 'prob_chrom']
+        else:
+            predictions_df.columns = ['x1', 'x2', 'probability', 'prob_mass', 'prob_chrom']
+        predictions_df['x1'] = predictions_df['x1'].astype(int)
+        predictions_df['x2'] = predictions_df['x2'].astype(int)
+        predictions_df.to_csv(predictions_save_name, index = None)
 
     prediction = prediction[0]  # Only take the main outcome
 
@@ -186,12 +196,7 @@ def printConfusionMatrix(prediction, info_df, comparisons):
 
 if __name__ == "__main__":
     prediction_data, comparisons, info_df, peak_df_orig, peak_intensity = prepareDataForPrediction(data_path, ignore_peak_profile)
-    prediction = runPrediction(prediction_data, model_path, model_file)
-    if predictions_save_name is not None:
-        predictions_df = pd.DataFrame(np.concatenate((comparisons, prediction), axis = 1), columns = ['x1', 'x2', 'prediction'])
-        predictions_df['x1'] = predictions_df['x1'].astype(int)
-        predictions_df['x2'] = predictions_df['x2'].astype(int)
-        predictions_df.to_csv(predictions_save_name, index = None)
+    prediction = runPrediction(prediction_data, model_path, model_file, predictions_save_name = predictions_save_name, comparisons = comparisons)
 
     distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10)
 
