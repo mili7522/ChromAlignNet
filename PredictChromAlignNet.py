@@ -108,8 +108,8 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
     prediction = model.predict(prediction_data, verbose = verbose)
     
     if predictions_save_name is not None and comparisons is not None:
-        predictions_df = pd.DataFrame(np.concatenate((comparisons, prediction), axis = 1))
-        if prediction.shape[1] == 3:
+        predictions_df = pd.DataFrame(np.concatenate((comparisons, np.squeeze(prediction).T), axis = 1))
+        if predictions_df.shape[1] == 6:
             predictions_df.columns = ['x1', 'x2', 'probability', 'prob_mass', 'prob_peak', 'prob_chrom']
         else:
             predictions_df.columns = ['x1', 'x2', 'probability', 'prob_mass', 'prob_chrom']
