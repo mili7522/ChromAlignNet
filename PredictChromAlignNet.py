@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
-import scipy.spatial
-import scipy.cluster
 import time
 import sys
 import os
 import tensorflow.keras.backend as K
 from tensorflow.keras.models import load_model
 from utils import loadData, getChromatographSegmentDf, generateCombinationIndices, getRealGroupAssignments, plotSpectrumTogether, plotPeaksTogether
+from utils import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix
 from model_definition import getModelVariant
 from parameters import prediction_options
 
@@ -124,72 +123,7 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
     return prediction
 
 
-### Group and cluster
-def getDistances(prediction):
-    distances = 1 / prediction
-    return distances
-    
 
-def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10):
-    distances = getDistances(prediction)
-    
-    distance_matrix = np.empty((number_of_peaks, number_of_peaks))
-    distance_matrix.fill(clip)  # Clip value
-    
-    for i, (x1, x2) in enumerate(comparisons):
-        distance_matrix[x1, x2] = min(distances[i], clip)
-        distance_matrix[x2, x1] = min(distances[i], clip)
-    
-    for i in range(number_of_peaks):
-        distance_matrix[i,i] = 0
-    
-    return distance_matrix
-
-
-def assignGroups(distance_matrix, threshold = 2):
-    sqform = scipy.spatial.distance.squareform(distance_matrix)
-    mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')
-#    plt.figure()
-#    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3)
-#    plt.savefig(data_path + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')
-    labels = scipy.cluster.hierarchy.fcluster(mergings, threshold, criterion = 'distance')
-    
-    groups = {}
-    for i in range(max(labels)):
-        groups[i] = set(np.where(labels == i + 1)[0])  # labels start at 1
-    
-    return groups
-
-
-def alignTimes(groups, info_df, align_to):
-    info_df[align_to] = info_df['peakMaxTime']
-    for group in groups.values():
-        times = info_df.loc[group, 'peakMaxTime']
-        average_time = np.mean(times)
-        info_df.loc[group, align_to] = average_time
-    
-
-def printConfusionMatrix(prediction, info_df, comparisons):
-    x1 = comparisons[:,0]
-    x2 = comparisons[:,1]
-    p = np.round(prediction).astype(int).reshape((-1))
-    g1 = info_df.loc[x1]['Group'].values
-    g2 = info_df.loc[x2]['Group'].values
-
-    keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
-    truth = (g1 == g2)
-    truth_ignore_neg = (g1[keep] == g2[keep])
-    p_ignore_neg = p[keep]
-
-    print('True positives: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(truth_ignore_neg), np.mean(p_ignore_neg[truth_ignore_neg])))
-    print('False positives - ignore negative indices: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[~truth_ignore_neg]), np.sum(~truth_ignore_neg), np.mean(p_ignore_neg[~truth_ignore_neg])))
-    print('False positives: {} / {} = {:.3f}'.format(np.sum(p[~truth]), np.sum(~truth), np.mean(p[~truth])))
-    
-    TP = np.mean(p_ignore_neg[truth_ignore_neg])
-    FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])
-    FP = np.mean(p[~truth])
-
-    return (TP, FP_ignore_neg, FP)
 
 
 ####

@@ -19,7 +19,12 @@ training_options = {
                   'data/training-Breath103-WithMassSlice/',     #3
                   'data/training-Breath115-WithMassSlice/',     #4
                   'data/training-Breath73-WithMassSlice-All/',  #5
-                  'data/training-Breath88-WithMassSlice-All/'   #6
+                  'data/training-Breath88-WithMassSlice-All/',  #6
+                  'data/test-Air92-WithMassSlice/',             #7
+                  'data/test-Air134-WithMassSlice/',            #8
+                  'data/test-Field73-WithMassSlice/',           #9
+                  'data/test-Field88-WithMassSlice/',           #10
+                  'data/test-Field134-WithMassSlice/'           #11
                 ],
     'dataset_for_model': {
                          'A': [0, 1],
@@ -41,11 +46,11 @@ prediction_options = {
     'ignore_negatives': False,  # Ignore groups assigned with a negative index?
     'time_cutoff': 3, # Three minutes
     'predictions_save_name': None,
-    'results_path': 'results',
+    'results_path': 'results/20181208-predictModelH_individuals',
 
     'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-D-02-r04',
-    'data_path': training_options['datasets'][3],
+    'model_file': 'ChromAlignNet-H-21-r09',
+    'data_path': training_options['datasets'][10],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
     'real_groups_available': True

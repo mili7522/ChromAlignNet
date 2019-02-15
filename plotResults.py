@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from utils import loadData, plotSpectrumTogether, plotPeaksTogether, getRealGroupAssignments
-from PredictChromAlignNet import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix
+from utils import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix
 from parameters import prediction_options
 
 data_path = prediction_options.get('data_path')
@@ -133,5 +133,5 @@ def plotPerformanceByModel(filename = None, use_false_pos_ignore_neg = True):
 
 if __name__ == "__main__":
     plotAlignments()
-    plotByIndex([2,10,17])
-    plotPerformanceByModel('results/ModelTests-OnBreath88.csv')
+#    plotByIndex([2,10,17])
+#    plotPerformanceByModel('results/ModelTests-OnBreath88.csv')
