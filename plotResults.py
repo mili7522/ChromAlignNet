@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from utils import loadData, plotSpectrumTogether, plotPeaksTogether, getRealGroupAssignments
-from utils import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix
+from utils import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix, postprocessGroups
 from parameters import prediction_options
 
 data_path = prediction_options.get('data_path')
@@ -17,8 +17,9 @@ def plotAlignments():
     prediction = pd.read_csv(prediction_file, usecols = [2]).values
     comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
 
-    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10)
+    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10, info_df = None)
     groups = assignGroups(distance_matrix, threshold = 2)
+    groups = postprocessGroups(groups, info_df)
     alignTimes(groups, info_df, 'AlignedTime')
     if real_groups_available:
         real_groups = getRealGroupAssignments(info_df)

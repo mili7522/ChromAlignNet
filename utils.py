@@ -375,18 +375,25 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None):
 
 
 ### Group and cluster
-def getDistances(prediction):
+def getDistances(prediction, comparisons, info_df):
     distances = 1 / prediction
+    if info_df is not None:
+        distances[info_df.loc[comparisons[:,0], 'File'].values == info_df.loc[comparisons[:,1], 'File'].values] = 1/(prediction/3)#np.inf
     return distances
     
 
-def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10):
-    distances = getDistances(prediction)
+def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_df = None):
+    distances = getDistances(prediction, comparisons, info_df)
     
     distance_matrix = np.empty((number_of_peaks, number_of_peaks))
     distance_matrix.fill(clip)  # Clip value
     
     for i, (x1, x2) in enumerate(comparisons):
+#        if np.isinf(distances[i]):
+#            MAX_VAL = clip
+#            distance_matrix[x1, x2] = MAX_VAL
+#            distance_matrix[x2, x1] = MAX_VAL
+#        else:
         distance_matrix[x1, x2] = min(distances[i], clip)
         distance_matrix[x2, x1] = min(distances[i], clip)
     
@@ -398,7 +405,7 @@ def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10):
 
 def assignGroups(distance_matrix, threshold = 2):
     sqform = scipy.spatial.distance.squareform(distance_matrix)
-    mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')
+    mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')  # centroid works well? Previously used 'average'
 #    plt.figure()
 #    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3)
 #    plt.savefig(data_path + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')
@@ -410,6 +417,32 @@ def assignGroups(distance_matrix, threshold = 2):
     
     return groups
 
+def postprocessGroups(groups, info_df):
+    max_group = len(groups) - 1  # max(groups.keys())
+    new_groups = {}
+    for i, group in groups.items():
+        group_df = info_df.loc[group].copy()
+        group_df.sort_values(by = 'peakMaxTime', axis = 0, inplace = True)
+        files = group_df['File']
+        files_count = dict()
+        new_groups[i] = set()
+        max_group_increment = 0
+        for peak, file in files.iteritems():
+            if file in files_count:
+                if max_group + files_count[file] not in new_groups:
+                    new_groups[max_group + files_count[file]] = set()
+                new_groups[max_group + files_count[file]].add(peak)
+                if files_count[file] > max_group_increment:
+                    max_group_increment += 1
+                files_count[file] += 1
+            else:
+                files_count[file] = 1
+                new_groups[i].add(peak)
+                
+        max_group += max_group_increment
+    
+    return new_groups
+            
 
 def alignTimes(groups, info_df, align_to):
     info_df[align_to] = info_df['peakMaxTime']

@@ -49,8 +49,8 @@ prediction_options = {
     'results_path': 'results/20181208-predictModelH_individuals',
 
     'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-H-21-r09',
-    'data_path': training_options['datasets'][10],
+    'model_file': 'ChromAlignNet-H-21-r03',
+    'data_path': training_options['datasets'][7],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
     'real_groups_available': True
