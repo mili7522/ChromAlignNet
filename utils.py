@@ -319,8 +319,10 @@ def plotPeaks(times, info_df, peak_df, min_time, max_time, resolution = 1/300, b
         peak_length = len(peak)
         steps_from_peak = np.round((row[1]['peakMaxTime'] - row[1]['startTime']) / resolution).astype(int)  # Number of timesteps from the start of the peak profile to its highest intensity
         peak_steps_from_beginning = np.round((times.loc[row[0]] - min_time) / resolution).astype(int)  # Index corresponding to the peak time (highest intensity)
-        peaks[peak_steps_from_beginning - steps_from_peak + buffer: peak_steps_from_beginning - steps_from_peak + peak_length + buffer,
-                int(row[1]['File'])] = peak  # Replace the default zeros of the reconstructed chromatogram with the peak profile at the appropriate time
+        idx_start = peak_steps_from_beginning - steps_from_peak + buffer
+        idx_end = peak_steps_from_beginning - steps_from_peak + peak_length + buffer
+        current_values = peaks[idx_start : idx_end, int(row[1]['File'])]
+        peaks[idx_start : idx_end, int(row[1]['File'])] = np.maximum(peak, current_values)  # Replace the default zeros of the reconstructed chromatogram with the peak profile at the appropriate time
     
     times = np.linspace(min_time - resolution * buffer, max_time + resolution * buffer, time_steps)
     return peaks, times
@@ -375,27 +377,25 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None):
 
 
 ### Group and cluster
-def getDistances(prediction, comparisons, info_df):
-    distances = 1 / prediction
-    if info_df is not None:
-        distances[info_df.loc[comparisons[:,0], 'File'].values == info_df.loc[comparisons[:,1], 'File'].values] = 1/(prediction/3)#np.inf
+def getDistances(prediction):
+    distances = 1 / (prediction)
     return distances
     
 
 def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_df = None):
-    distances = getDistances(prediction, comparisons, info_df)
+    distances = getDistances(prediction)
     
     distance_matrix = np.empty((number_of_peaks, number_of_peaks))
     distance_matrix.fill(clip)  # Clip value
     
     for i, (x1, x2) in enumerate(comparisons):
-#        if np.isinf(distances[i]):
-#            MAX_VAL = clip
-#            distance_matrix[x1, x2] = MAX_VAL
-#            distance_matrix[x2, x1] = MAX_VAL
-#        else:
-        distance_matrix[x1, x2] = min(distances[i], clip)
-        distance_matrix[x2, x1] = min(distances[i], clip)
+        if info_df is not None and info_df.loc[x1, 'File'] == info_df.loc[x2, 'File']:
+            val = min(distances[i] * 5, clip * 3)
+        elif info_df is not None and np.abs(info_df.loc[x1, 'peakMaxTime'] - info_df.loc[x2, 'peakMaxTime']) > 0.4:
+            val = min(distances[i] * 2, clip)
+        else:
+            val = min(distances[i], clip)
+        distance_matrix[x1, x2] = distance_matrix[x2, x1] = val
     
     for i in range(number_of_peaks):
         distance_matrix[i,i] = 0
@@ -406,8 +406,8 @@ def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_
 def assignGroups(distance_matrix, threshold = 2):
     sqform = scipy.spatial.distance.squareform(distance_matrix)
     mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')  # centroid works well? Previously used 'average'
-#    plt.figure()
-#    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3)
+    plt.figure()
+    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3, color_threshold = threshold)
 #    plt.savefig(data_path + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')
     labels = scipy.cluster.hierarchy.fcluster(mergings, threshold, criterion = 'distance')
     

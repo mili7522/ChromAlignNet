@@ -17,8 +17,8 @@ def plotAlignments():
     prediction = pd.read_csv(prediction_file, usecols = [2]).values
     comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
 
-    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10, info_df = None)
-    groups = assignGroups(distance_matrix, threshold = 2)
+    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10, info_df = info_df)
+    groups = assignGroups(distance_matrix, threshold = 1.8)
     groups = postprocessGroups(groups, info_df)
     alignTimes(groups, info_df, 'AlignedTime')
     if real_groups_available:
