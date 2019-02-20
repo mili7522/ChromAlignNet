@@ -390,7 +390,9 @@ def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_
     
     for i, (x1, x2) in enumerate(comparisons):
         if info_df is not None and info_df.loc[x1, 'File'] == info_df.loc[x2, 'File']:
-            val = min(distances[i] * 5, clip * 3)
+            val = min(distances[i] * 2, clip * 2)
+            if np.abs(info_df.loc[x1, 'peakMaxTime'] - info_df.loc[x2, 'peakMaxTime']) > 0.09:
+                val = clip * 5
         elif info_df is not None and np.abs(info_df.loc[x1, 'peakMaxTime'] - info_df.loc[x2, 'peakMaxTime']) > 0.4:
             val = min(distances[i] * 2, clip)
         else:
@@ -444,11 +446,13 @@ def postprocessGroups(groups, info_df):
     return new_groups
             
 
-def alignTimes(groups, info_df, align_to):
+def alignTimes(groups, info_df, peak_intensity, align_to):
     info_df[align_to] = info_df['peakMaxTime']
     for group in groups.values():
         times = info_df.loc[group, 'peakMaxTime']
-        average_time = np.mean(times)
+        peak_values = peak_intensity.loc[group]
+        average_time = np.average(times, weights = peak_values)
+#        average_time = np.mean(times)
         info_df.loc[group, align_to] = average_time
     
 

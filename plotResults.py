@@ -20,10 +20,10 @@ def plotAlignments():
     distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10, info_df = info_df)
     groups = assignGroups(distance_matrix, threshold = 1.8)
     groups = postprocessGroups(groups, info_df)
-    alignTimes(groups, info_df, 'AlignedTime')
+    alignTimes(groups, info_df, peak_intensity, 'AlignedTime')
     if real_groups_available:
         real_groups = getRealGroupAssignments(info_df)
-        alignTimes(real_groups, info_df, 'RealAlignedTime')
+        alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
         printConfusionMatrix(prediction, info_df, comparisons)
 
     plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
