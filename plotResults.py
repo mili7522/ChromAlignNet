@@ -26,8 +26,11 @@ def plotAlignments():
         alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
         printConfusionMatrix(prediction, info_df, comparisons)
 
-    plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
-    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = None)
+    plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = '../figures/alignment_image')
+#    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot')
+    # if want to save the full spectra data (original, aligned and truth)
+    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot', save_data = True)
+
 
 
 def plotByIndex(index = None, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False):

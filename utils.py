@@ -332,13 +332,14 @@ def plotPeaks(times, info_df, peak_df, min_time, max_time, resolution = 1/300, b
     return peaks, times
 
 
-def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None):
+def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None, save_data = False):
     ''' Plots several reconstructed chromatograms stacked together, to compare the prediction output with the input and groundtruth
     Keyword arguments:
         info_df - DataFrame containing information about each peak, including aligned and unaligned peak times and file number
         peak_df - Dataframe of the peak profile of each peak
         with_real - Boolean: To include the groundtruth as a third plot or not
         save_name - None or String: Name to save the figure
+        save_data - False or True
     '''
     # Get min_time and max_time to pass into each call of plotPeaks, so that each plot is aligned
     min_time = min(info_df['startTime'])
@@ -378,6 +379,17 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None):
         plt.savefig(save_name + '.eps', dpi = 250, format = 'eps', bbox_inches = 'tight')
     else:
         plt.show()
+        
+    # save the data
+    if save_data is not None:
+        df_tmp = pd.DataFrame(orig_peaks)
+        df_tmp.to_csv("peaksUnaligned.csv", index=False)
+        df_tmp = pd.DataFrame(peaks)
+        df_tmp.to_csv("peaksAligned.csv", index=False)
+        df_tmp = pd.DataFrame(real_peaks)
+        df_tmp.to_csv("peaksTruth.csv", index=False)        
+        df_tmp = pd.DataFrame(time)
+        df_tmp.to_csv("time.csv", index=False)        
 
 
 ### Group and cluster
