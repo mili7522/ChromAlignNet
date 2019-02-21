@@ -235,7 +235,11 @@ def plotSpectrum(times, files, peak_intensity, resolution = 1/300, buffer = 5,
     number_of_files = files.max() + 1
     spectrum = np.zeros((number_of_files, max_time_index + buffer * 2))
 #    spectrum[files, timeIndex + buffer] = 1
-    spectrum[files, timeIndex + buffer] = np.clip(peak_intensity, 0, clip)
+    # Get the maximum value when multiple peaks from the same file are assigned to the same time point
+    timeIndexValues = pd.concat([timeIndex, files, peak_intensity], axis = 1)
+    timeIndexValues.columns = ['Index', 'File', 'Value']
+    timeIndexValues = timeIndexValues.groupby(['File', 'Index'], as_index = False).max()
+    spectrum[timeIndexValues['File'], timeIndexValues['Index'] + buffer] = np.clip(timeIndexValues['Value'], 0, clip)
 #    spectrum[files, timeIndex + buffer] = peak_intensity
     
     if ax is None:
