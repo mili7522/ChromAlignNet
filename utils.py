@@ -394,10 +394,8 @@ def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_
     
     for i, (x1, x2) in enumerate(comparisons):
         if info_df is not None and info_df.loc[x1, 'File'] == info_df.loc[x2, 'File']:
-            val = min(distances[i] * 2, clip * 2)
-            if np.abs(info_df.loc[x1, 'peakMaxTime'] - info_df.loc[x2, 'peakMaxTime']) > 0.09:
-                val = clip * 5
-        elif info_df is not None and np.abs(info_df.loc[x1, 'peakMaxTime'] - info_df.loc[x2, 'peakMaxTime']) > 0.4:
+            val = min(distances[i] * 2, clip)
+        elif info_df is not None and np.abs(info_df.loc[x1, 'peakMaxTime'] - info_df.loc[x2, 'peakMaxTime']) > 0.5:
             val = min(distances[i] * 2, clip)
         else:
             val = min(distances[i], clip)
@@ -412,8 +410,8 @@ def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_
 def assignGroups(distance_matrix, threshold = 2):
     sqform = scipy.spatial.distance.squareform(distance_matrix)
     mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')  # centroid works well? Previously used 'average'
-    plt.figure()
-    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3, color_threshold = threshold)
+#    plt.figure()
+#    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3, color_threshold = threshold)
 #    plt.savefig(data_path + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')
     labels = scipy.cluster.hierarchy.fcluster(mergings, threshold, criterion = 'distance')
     
