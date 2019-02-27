@@ -136,6 +136,49 @@ def plotPerformanceByModel(filename = None, use_false_pos_ignore_neg = True):
 
 
 if __name__ == "__main__":
-    plotAlignments()
+#    plotAlignments()
 #    plotByIndex([2,10,17])
 #    plotPerformanceByModel('results/ModelTests-OnBreath88.csv')
+
+    #TODO: Assign unique numbers to the -1 group peaks
+    max_group = info_df['Group'].max()
+    neg_groups = info_df['Group'] < 0
+    info_df.loc[neg_groups, 'Group'] = range(max_group + 1, max_group + 1 + neg_groups.sum())
+    
+    sorted_groups = info_df.groupby('Group').mean().sort_values('peakMaxTime').index
+    sorted_groups_dict = dict(zip(sorted_groups, range(len(sorted_groups))))
+#    idx_arrangement = info_df['Group'].map(sorted_groups_dict).argsort()
+#    idx_arrangement_dict = dict(zip(idx_arrangement, idx_arrangement.index))
+    idx_arrangement = pd.concat([info_df['Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1).sort_values(by = ['Group', 'peakMaxTime']).index # Sort by both Group and peakMaxTime
+    idx_arrangement_dict = dict(zip(idx_arrangement, range(len(idx_arrangement)) ))
+    
+    prediction_file = prediction_options.get('predictions_save_name')
+    prediction = pd.read_csv(prediction_file, usecols = [2]).values
+    comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+    
+    number_of_peaks = comparisons.max() + 1
+    
+    prediction_matrix = np.zeros((number_of_peaks, number_of_peaks))
+    
+    for i, (x1, x2) in enumerate(comparisons):
+        x1 = idx_arrangement_dict[x1]
+        x2 = idx_arrangement_dict[x2]
+        prediction_matrix[x1, x2] = prediction_matrix[x2, x1] = prediction[i]
+
+#    group_matrix = np.zeros((number_of_peaks, number_of_peaks))        
+#    for i in range(number_of_peaks):
+#        i_ = idx_arrangement_dict[i]
+#        group_matrix[:, i_] = sorted_groups_dict[info_df.loc[i, 'Group']]
+
+    np.fill_diagonal(prediction_matrix, 1)
+    
+
+    new_idx_groups = info_df.loc[idx_arrangement, 'Group'].values
+    group_change_idx = np.flatnonzero( np.diff(new_idx_groups) )  # Gives last idx before group change, zero indexed
+    
+    import matplotlib.pyplot as plt
+    
+    plt.imshow(prediction_matrix); plt.colorbar(label = 'Probability')
+    for x in group_change_idx:
+        plt.axvline(x=x+0.5, c = 'red', linewidth = 1, alpha = 1)
+        plt.axhline(y=x+0.5, c = 'red', linewidth = 1, alpha = 1)
