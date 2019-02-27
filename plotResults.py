@@ -143,13 +143,14 @@ if __name__ == "__main__":
     #TODO: Assign unique numbers to the -1 group peaks
     max_group = info_df['Group'].max()
     neg_groups = info_df['Group'] < 0
-    info_df.loc[neg_groups, 'Group'] = range(max_group + 1, max_group + 1 + neg_groups.sum())
+    info_df['New_Group'] = info_df['Group']
+    info_df.loc[neg_groups, 'New_Group'] = range(max_group + 1, max_group + 1 + neg_groups.sum())
     
-    sorted_groups = info_df.groupby('Group').mean().sort_values('peakMaxTime').index
+    sorted_groups = info_df.groupby('New_Group').mean().sort_values('peakMaxTime').index
     sorted_groups_dict = dict(zip(sorted_groups, range(len(sorted_groups))))
 #    idx_arrangement = info_df['Group'].map(sorted_groups_dict).argsort()
 #    idx_arrangement_dict = dict(zip(idx_arrangement, idx_arrangement.index))
-    idx_arrangement = pd.concat([info_df['Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1).sort_values(by = ['Group', 'peakMaxTime']).index # Sort by both Group and peakMaxTime
+    idx_arrangement = pd.concat([info_df['New_Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1).sort_values(by = ['New_Group', 'peakMaxTime']).index # Sort by both Group and peakMaxTime
     idx_arrangement_dict = dict(zip(idx_arrangement, range(len(idx_arrangement)) ))
     
     prediction_file = prediction_options.get('predictions_save_name')
@@ -161,9 +162,14 @@ if __name__ == "__main__":
     prediction_matrix = np.zeros((number_of_peaks, number_of_peaks))
     
     for i, (x1, x2) in enumerate(comparisons):
-        x1 = idx_arrangement_dict[x1]
-        x2 = idx_arrangement_dict[x2]
-        prediction_matrix[x1, x2] = prediction_matrix[x2, x1] = prediction[i]
+        x1_ = idx_arrangement_dict[x1]
+        x2_ = idx_arrangement_dict[x2]
+        prediction_matrix[x1_, x2_] = prediction_matrix[x2_, x1_] = prediction[i]
+        if info_df.loc[x1, 'Group'] < 0 and info_df.loc[x2, 'Group'] < 0:
+            if x1_ < x2_:
+                prediction_matrix[x2_, x1_] = 0
+            else:
+                prediction_matrix[x1_, x2_] = 0
 
 #    group_matrix = np.zeros((number_of_peaks, number_of_peaks))        
 #    for i in range(number_of_peaks):
@@ -175,10 +181,14 @@ if __name__ == "__main__":
 
     new_idx_groups = info_df.loc[idx_arrangement, 'Group'].values
     group_change_idx = np.flatnonzero( np.diff(new_idx_groups) )  # Gives last idx before group change, zero indexed
+    # Remove marking negative indices
     
     import matplotlib.pyplot as plt
+    
+#    prediction_matrix = prediction_matrix > 0.5
     
     plt.imshow(prediction_matrix); plt.colorbar(label = 'Probability')
     for x in group_change_idx:
         plt.axvline(x=x+0.5, c = 'red', linewidth = 1, alpha = 1)
         plt.axhline(y=x+0.5, c = 'red', linewidth = 1, alpha = 1)
+    plt.title('Air92')
