@@ -381,7 +381,7 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None, sav
         plt.show()
         
     # save the data
-    if save_data is not None:
+    if save_data:
         df_tmp = pd.DataFrame(orig_peaks)
         df_tmp.to_csv("peaksUnaligned.csv", index=False)
         df_tmp = pd.DataFrame(peaks)
@@ -394,7 +394,7 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None, sav
 
 ### Group and cluster
 def getDistances(prediction):
-    distances = 1 / (prediction)
+    distances = 1 / prediction
     return distances
     
 
@@ -421,7 +421,7 @@ def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_
 
 def assignGroups(distance_matrix, threshold = 2):
     sqform = scipy.spatial.distance.squareform(distance_matrix)
-    mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')  # centroid works well? Previously used 'average'
+    mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')
 #    plt.figure()
 #    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3, color_threshold = threshold)
 #    plt.savefig(data_path + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')

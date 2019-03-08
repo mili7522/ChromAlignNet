@@ -1,6 +1,6 @@
-import tensorflow.keras.backend as K
-from tensorflow.keras.models import Model, Sequential
-from tensorflow.keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D, LSTM, Bidirectional, GRU
+import keras.backend as K
+from keras.models import Model, Sequential
+from keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, Conv1D, Flatten, MaxPooling1D, LSTM, Bidirectional, GRU
 
 
 class ChromAlignModel:

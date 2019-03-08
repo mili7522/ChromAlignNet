@@ -3,8 +3,8 @@ import numpy as np
 import time
 import sys
 import os
-import tensorflow.keras.backend as K
-from tensorflow.keras.models import load_model
+import keras.backend as K
+from keras.models import load_model
 from utils import loadData, getChromatographSegmentDf, generateCombinationIndices, getRealGroupAssignments, plotSpectrumTogether, plotPeaksTogether
 from utils import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix
 from model_definition import getModelVariant
@@ -143,12 +143,13 @@ if __name__ == "__main__":
         printConfusionMatrix(prediction, info_df, comparisons)
 
 
-    if ignore_negatives:
-        plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_intensity[info_df['Group'] >= 0], with_real = real_groups_available)
-    else:
-        plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available)
-
-    if ignore_negatives:
-        plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)
-    else:
-        plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available)
+# TODO: Add option to control plotting
+#    if ignore_negatives:
+#        plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_intensity[info_df['Group'] >= 0], with_real = real_groups_available)
+#    else:
+#        plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available)
+#
+#    if ignore_negatives:
+#        plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)
+#    else:
+#        plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available)

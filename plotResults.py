@@ -140,7 +140,7 @@ if __name__ == "__main__":
 #    plotByIndex([2,10,17])
 #    plotPerformanceByModel('results/ModelTests-OnBreath88.csv')
 
-    #TODO: Assign unique numbers to the -1 group peaks
+    #Assign unique numbers to the -1 group peaks
     max_group = info_df['Group'].max()
     neg_groups = info_df['Group'] < 0
     info_df['New_Group'] = info_df['Group']
@@ -191,4 +191,4 @@ if __name__ == "__main__":
     for x in group_change_idx:
         plt.axvline(x=x+0.5, c = 'red', linewidth = 1, alpha = 1)
         plt.axhline(y=x+0.5, c = 'red', linewidth = 1, alpha = 1)
-    plt.title('Air92')
+#    plt.title('Breath115')

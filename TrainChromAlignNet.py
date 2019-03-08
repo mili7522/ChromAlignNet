@@ -4,9 +4,9 @@ import time
 import sys
 import os
 import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.callbacks import ModelCheckpoint, CSVLogger
-from tensorflow.keras.optimizers import Adam
+from keras.models import load_model
+from keras.callbacks import ModelCheckpoint, CSVLogger
+from keras.optimizers import Adam
 from utils import loadData, getChromatographSegmentDf, generateCombinationIndices
 from model_definition import getModelVariant
 from parameters import training_options
