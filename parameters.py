@@ -53,7 +53,7 @@ prediction_options = {
 
     'model_path': 'SavedModels/',
     'model_file': 'ChromAlignNet-H-32-r03',
-    'data_path': training_options['datasets'][7],
+    'data_path': training_options['datasets'][9],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
     'real_groups_available': True

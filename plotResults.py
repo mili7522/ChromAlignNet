@@ -12,6 +12,7 @@ real_groups_available = prediction_options.get('real_groups_available')
 
 info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
 
+
 def plotAlignments():
     prediction_file = prediction_options.get('predictions_save_name')
     prediction = pd.read_csv(prediction_file, usecols = [2]).values
@@ -26,10 +27,10 @@ def plotAlignments():
         alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
         printConfusionMatrix(prediction, info_df, comparisons)
 
-    plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = '../figures/alignment_image')
+    plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
 #    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot')
     # if want to save the full spectra data (original, aligned and truth)
-    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot', save_data = True)
+    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = None, save_data = False)
 
 
 
@@ -109,9 +110,9 @@ def plotPerformanceByModel(filename = None, use_false_pos_ignore_neg = True):
     # Select appropriate false positives column
     if use_false_pos_ignore_neg:
         del df['False Positives']
-        df = df.rename(columns = {'False Positives - Ignore Neg Indices': 'False Positives'})
+        df = df.rename(columns = {'False Positives - Ignore Neg Idx': 'False Positives'})
 
-    g = df[['True Positives', 'False Positives', 'Model Number']].groupby('Model Number')
+    g = df[['True Positives', 'False Positives', 'Model Name']].groupby('Model Name')
     mean = g.mean()
     std = g.std()
 
@@ -125,70 +126,80 @@ def plotPerformanceByModel(filename = None, use_false_pos_ignore_neg = True):
     ax.plot((-1,19), [mean.iloc[0]['False Positives'] + std.iloc[0]['False Positives']] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
     ax.plot((-1,19), [mean.iloc[0]['False Positives'] - std.iloc[0]['False Positives']] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
 
-    mean.index = ['3.{:02d}'.format(x) for x in mean.index]
     mean.plot.bar(width = 0.75, ax = ax, zorder = 1,
         yerr = std.values.T, error_kw = {'elinewidth': 0.5, 'capthick': 0.5, 'ecolor': 'black', 'capsize': 1})
     plt.ylim(0, 1)
     plt.legend(loc='lower left', fontsize = 'small', framealpha = 1, frameon = True)
-    plt.xlabel('Model Number')
+    plt.xlabel('Model Name')
 
     plt.show()
 
 
-if __name__ == "__main__":
-#    plotAlignments()
-#    plotByIndex([2,10,17])
-#    plotPerformanceByModel('results/ModelTests-OnBreath88.csv')
-
-    #Assign unique numbers to the -1 group peaks
-    max_group = info_df['Group'].max()
-    neg_groups = info_df['Group'] < 0
-    info_df['New_Group'] = info_df['Group']
-    info_df.loc[neg_groups, 'New_Group'] = range(max_group + 1, max_group + 1 + neg_groups.sum())
+def plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_negative_group = True):
     
-    sorted_groups = info_df.groupby('New_Group').mean().sort_values('peakMaxTime').index
-    sorted_groups_dict = dict(zip(sorted_groups, range(len(sorted_groups))))
-#    idx_arrangement = info_df['Group'].map(sorted_groups_dict).argsort()
-#    idx_arrangement_dict = dict(zip(idx_arrangement, idx_arrangement.index))
-    idx_arrangement = pd.concat([info_df['New_Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1).sort_values(by = ['New_Group', 'peakMaxTime']).index # Sort by both Group and peakMaxTime
+    if sort_by_group:
+        #Assign unique numbers to the -1 group peaks
+        max_group = info_df['Group'].max()
+        neg_groups = info_df['Group'] < 0
+        info_df['New_Group'] = info_df['Group']
+        info_df.loc[neg_groups, 'New_Group'] = range(max_group + 1, max_group + 1 + neg_groups.sum())
+        
+        sorted_groups = info_df.groupby('New_Group').mean().sort_values('peakMaxTime').index  # Gives the ordering of the groups sorted by average peak RT
+        sorted_groups_dict = dict(zip(sorted_groups, range(len(sorted_groups))))  # Mapping between the old group ID and new group ID based on the sort order
+        idx_arrangement = pd.concat([info_df['New_Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1).sort_values(by = ['New_Group', 'peakMaxTime']).index # Sort by Group, then peakMaxTime
+    else:
+        idx_arrangement = info_df.sort_values('peakMaxTime').index
     idx_arrangement_dict = dict(zip(idx_arrangement, range(len(idx_arrangement)) ))
     
     prediction_file = prediction_options.get('predictions_save_name')
     prediction = pd.read_csv(prediction_file, usecols = [2]).values
     comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
     
-    number_of_peaks = comparisons.max() + 1
+    number_of_peaks = len(info_df)
     
     prediction_matrix = np.zeros((number_of_peaks, number_of_peaks))
+    np.fill_diagonal(prediction_matrix, 1)
     
     for i, (x1, x2) in enumerate(comparisons):
         x1_ = idx_arrangement_dict[x1]
         x2_ = idx_arrangement_dict[x2]
         prediction_matrix[x1_, x2_] = prediction_matrix[x2_, x1_] = prediction[i]
-        if info_df.loc[x1, 'Group'] < 0 and info_df.loc[x2, 'Group'] < 0:
+        if highlight_negative_group and info_df.loc[x1, 'Group'] < 0 and info_df.loc[x2, 'Group'] < 0:  # Highlight peaks with a negative group by not plotting below the diagonal when both peaks are negative
             if x1_ < x2_:
                 prediction_matrix[x2_, x1_] = 0
             else:
                 prediction_matrix[x1_, x2_] = 0
 
-#    group_matrix = np.zeros((number_of_peaks, number_of_peaks))        
-#    for i in range(number_of_peaks):
-#        i_ = idx_arrangement_dict[i]
-#        group_matrix[:, i_] = sorted_groups_dict[info_df.loc[i, 'Group']]
+    if threshold is not None:
+        prediction_matrix = prediction_matrix > threshold
+    
+    max_time = info_df['peakMaxTime'].max()
+    min_time = info_df['peakMaxTime'].min()
+    plt.imshow(prediction_matrix, extent = None if sort_by_group else (min_time, max_time, max_time, min_time))
+    
+    dataset_name = prediction_file.split('_')[-2]
+    if threshold is not None:
+        plt.title('{}\nProbability Threshold: {}'.format(dataset_name, threshold))
+    else:
+        plt.title('{}'.format(dataset_name))
+        plt.colorbar(label = 'Probability')
+        
+    if sort_by_group:
+        new_idx_groups = info_df.loc[idx_arrangement, 'Group'].values
+        group_change_idx = np.flatnonzero( np.diff(new_idx_groups) )  # Gives last idx before (non-negative) group change, zero indexed
+        for x in group_change_idx:
+            plt.axvline(x=x+0.5, c = 'red', linewidth = 1, alpha = 1)
+            plt.axhline(y=x+0.5, c = 'red', linewidth = 1, alpha = 1)
+        plt.xlabel('Index')
+        plt.ylabel('Index')
+    else:
+        plt.xlabel('Min')
+        plt.ylabel('Min')
 
-    np.fill_diagonal(prediction_matrix, 1)
-    
 
-    new_idx_groups = info_df.loc[idx_arrangement, 'Group'].values
-    group_change_idx = np.flatnonzero( np.diff(new_idx_groups) )  # Gives last idx before group change, zero indexed
-    # Remove marking negative indices
-    
-    import matplotlib.pyplot as plt
-    
-#    prediction_matrix = prediction_matrix > 0.5
-    
-    plt.imshow(prediction_matrix); plt.colorbar(label = 'Probability')
-    for x in group_change_idx:
-        plt.axvline(x=x+0.5, c = 'red', linewidth = 1, alpha = 1)
-        plt.axhline(y=x+0.5, c = 'red', linewidth = 1, alpha = 1)
-#    plt.title('Breath115')
+if __name__ == "__main__":
+#    plotAlignments()
+#    plotByIndex([2,10,17])
+#    plotPerformanceByModel('results/ModelTests-OnField73.csv')
+    plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_negative_group = True)
+
