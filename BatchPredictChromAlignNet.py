@@ -43,6 +43,9 @@ else:
 
 data_path = data_paths[j]
 
+individual_predictions_save_path = 'Individual'
+os.makedirs(os.path.join(results_path, individual_predictions_save_path), exist_ok = True)
+
 
 ### Load and pre-process data
 confusion_matrices = []
@@ -85,32 +88,30 @@ for i in model_variants:
             # model_name_list.append(model_names[i+1])   # XRW -- for full models -- no longer needed
             # model_variant_list.append(i)   # XRW -- for sub-models  -- no longer needed
             
+            predictions_save_name = '{}/{}/{}_{}_Prediction.csv'.format(results_path, individual_predictions_save_path, model_file, data_path.split('-')[1])  # TODO: Make saving optional?
+            
             predict_time = time.time()
-            prediction = runPrediction(prediction_data, model_path, model_file, verbose = verbose_prediction)
+            prediction_all = runPrediction(prediction_data, model_path, model_file, verbose = verbose_prediction,
+                                           predictions_save_name = predictions_save_name, comparisons = comparisons)
+            prediction = prediction_all[0]
             
-            print('Time to predict:', round((time.time() - predict_time)/60, 2), 'min')
+            print('Time to predict:', round((time.time() - predict_time)/60, 2), 'min')  # Duplicates what's inside runPrediction
             prediction_times.append(round((time.time() - predict_time)/60, 2))
-        
-            ### Group and cluster
             
-            clusterTime = time.time()
-            distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10)
-            groups = assignGroups(distance_matrix, threshold = 2)
-            
-            print('Time to cluster:', round((time.time() - clusterTime)/60, 2), 'min')
-            
-            ### Plot spectrum and peaks    # XRW 08-10: I don't think this is about plot spectrum
-            alignTimes(groups, info_df, 'AlignedTime')
-            if real_groups_available:
-                real_groups = getRealGroupAssignments(info_df)
-                alignTimes(real_groups, info_df, 'RealAlignedTime')
-                confusion_matrices.append(printConfusionMatrix(prediction, info_df, comparisons))
+            ### 
+            confusion_matrices.append(printConfusionMatrix(prediction, info_df, comparisons) + 
+                                      printConfusionMatrix(prediction_all[1], info_df, comparisons) + 
+                                      printConfusionMatrix(prediction_all[2], info_df, comparisons))  # TODO: Make this more general
             sys.stdout.flush()  
             
 
-        cm_df = pd.DataFrame(confusion_matrices, columns = ['True Positives', 'False Positives - Ignore Neg Idx', 'False Positives'])
+        cm_df = pd.DataFrame(confusion_matrices, columns = ['True Positives', 'False Positives - Ignore Neg Idx', 'False Positives', 'Recall', 'Precision', 'F1',
+                                                            'TP-Mass', 'FP-IgnNeg-Mass', 'FP-Mass', 'Recall-Mass', 'Precision-Mass', 'F1-Mass',
+                                                            'TP-Chrom', 'FP-IgnNeg-Chrom', 'FP-Chrom', 'Recall-Chrom', 'Precision-Chrom', 'F1-Chrom'])  # TODO: Generalise
         df = pd.concat([cm_df, pd.DataFrame(prediction_times, columns = ['Prediction Times'])], axis = 1)
         # df['Model Name']   # no longer needed
         # df['Model Variant'] = model_variant_list   # no longer needed
         df['Model Name'] = model_fullname_list
         df.to_csv(save_name)
+
+df.groupby('Model Name').mean().to_csv(save_name[:-4] + '_Mean.csv')

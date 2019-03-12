@@ -490,4 +490,12 @@ def printConfusionMatrix(prediction, info_df, comparisons):
     FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])
     FP = np.mean(p[~truth])
 
-    return (TP, FP_ignore_neg, FP)
+    recall = TP
+    precision = np.sum(p_ignore_neg[truth_ignore_neg]) / np.sum(p_ignore_neg)
+    f1 = 2 * (precision * recall) / (precision + recall)
+    
+    print('Recall: {:.3f}'.format(recall))
+    print('Precision: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(p_ignore_neg), precision))
+    print('F1: {:.3f}'.format(f1))
+
+    return (TP, FP_ignore_neg, FP, recall, precision, f1)

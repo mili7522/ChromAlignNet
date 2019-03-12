@@ -116,7 +116,7 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
         predictions_df['x2'] = predictions_df['x2'].astype(int)
         predictions_df.to_csv(predictions_save_name, index = None)
 
-    prediction = prediction[0]  # Only take the main outcome
+#    prediction = prediction[0]  # Only take the main outcome
 
     #print('Time to predict:', round((time.time() - predict_time)/60, 2), 'min')
     print('Time to predict:', time.time() - predict_time, 'sec')
@@ -130,17 +130,18 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
 
 if __name__ == "__main__":
     prediction_data, comparisons, info_df, peak_df_orig, peak_intensity = prepareDataForPrediction(data_path, ignore_peak_profile)
-    prediction = runPrediction(prediction_data, model_path, model_file, predictions_save_name = predictions_save_name, comparisons = comparisons)
+    prediction_all = runPrediction(prediction_data, model_path, model_file, predictions_save_name = predictions_save_name, comparisons = comparisons)
+    prediction = prediction_all[0]
 
-    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 10)
+    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 50)
 
     groups = assignGroups(distance_matrix, threshold = 2)
 
-    alignTimes(groups, info_df, 'AlignedTime')
+    alignTimes(groups, info_df, peak_intensity, 'AlignedTime')
     if real_groups_available:
         real_groups = getRealGroupAssignments(info_df)
-        alignTimes(real_groups, info_df, 'RealAlignedTime')
         printConfusionMatrix(prediction, info_df, comparisons)
+        alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
 
 
 # TODO: Add option to control plotting
