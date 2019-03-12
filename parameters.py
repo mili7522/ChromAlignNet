@@ -42,25 +42,28 @@ training_options = {
     'sequence_file': 'WholeSequence.csv'
 }
 
+def getDatasetName(path):
+    return path.split('-')[-1].strip('/')
+
 prediction_options = {
     'ignore_negatives': False,  # Ignore groups assigned with a negative index?
     'time_cutoff': 3, # Three minutes
     'predictions_save_name': None,
-    'results_path': 'results/20181208-predictModelH_individuals',
+    'results_path': 'results/Individual',
 
     'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-H-21-r03',
+    'model_file': 'ChromAlignNet-H-32-r03',
     'data_path': training_options['datasets'][7],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
     'real_groups_available': True
 }
 
-prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(prediction_options['results_path'], prediction_options['model_file'], prediction_options['data_path'].split('-')[1])
+prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(prediction_options['results_path'], prediction_options['model_file'], getDatasetName(prediction_options['data_path']))
 
 
 batch_prediction_options = {
-    'save_names': ["ModelTests-On{}.csv".format(x.split('-')[1]) for x in training_options['datasets']],
+    'save_names': ["ModelTests-On{}.csv".format(getDatasetName(x)) for x in training_options['datasets']],
     'model_repeats': range(1,11),
     'model_names': ['G'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
     'model_variants': [1], #[20, 21, 26], # range(1, 28),
