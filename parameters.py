@@ -13,18 +13,18 @@ training_options = {
     'model_name': 'ChromAlignNet',
 
 
-    'datasets': [ 'data/training-Air103-WithMassSlice/',        #0
-                  'data/training-Air115-WithMassSlice/',        #1
-                  'data/training-Air143-WithMassSlice/',        #2
-                  'data/training-Breath103-WithMassSlice/',     #3
-                  'data/training-Breath115-WithMassSlice/',     #4
-                  'data/training-Breath73-WithMassSlice-All/',  #5
-                  'data/training-Breath88-WithMassSlice-All/',  #6
-                  'data/test-Air92-WithMassSlice/',             #7
-                  'data/test-Air134-WithMassSlice/',            #8
-                  'data/test-Field73-WithMassSlice/',           #9
-                  'data/test-Field88-WithMassSlice/',           #10
-                  'data/test-Field134-WithMassSlice/'           #11
+    'datasets': [ 'data/training-Air103/',        #0
+                  'data/training-Air115/',        #1
+                  'data/training-Air143/',        #2
+                  'data/training-Breath103/',     #3
+                  'data/training-Breath115/',     #4
+                  'data/training-Breath73/',      #5
+                  'data/training-Breath88/',  	  #6
+                  'data/test-Air92/',             #7
+                  'data/test-Air134/',            #8
+                  'data/test-Field73/',           #9
+                  'data/test-Field88/',           #10
+                  'data/test-Field134/'           #11
                 ],
     'dataset_for_model': {
                          'A': [0, 1],
