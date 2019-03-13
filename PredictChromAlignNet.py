@@ -5,8 +5,8 @@ import sys
 import os
 import keras.backend as K
 from keras.models import load_model
-from utils import loadData, getChromatographSegmentDf, generateCombinationIndices, getRealGroupAssignments, plotSpectrumTogether, plotPeaksTogether
-from utils import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix
+from utils import loadData, getChromatographSegmentDf, generateCombinationIndices, getRealGroupAssignments#, plotSpectrumTogether, plotPeaksTogether
+from utils import getDistanceMatrix, assignGroups, alignTimes, calculateMetrics
 from model_definition import getModelVariant
 from parameters import prediction_options
 
@@ -19,6 +19,9 @@ real_groups_available = prediction_options.get('real_groups_available')
 info_file = prediction_options.get('info_file')
 sequence_file = prediction_options.get('sequence_file')
 results_path = prediction_options.get('results_path')
+
+calculate_f1_metric = prediction_options.get('calculate_f1_metric')
+calculate_metrics_for_components = prediction_options.get('calculate_metrics_for_components')
 ###
 
 ### These parameter are loaded individually in any batch prediction scripts, since they may change per model / data source
@@ -95,6 +98,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
 
 
     print('Time to load and generate samples: {:.2f} sec'.format(time.time() - load_time))
+    print('===============\nPredictions:')
     sys.stdout.flush()
     
     return prediction_data, comparisons, info_df, peak_df_orig, peak_intensity
@@ -102,8 +106,11 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
 
 def runPrediction(prediction_data, model_path, model_file, verbose = 1, predictions_save_name = None, comparisons = None):
     '''
+    Output:
+        predictions - list of numpy arrays. Each item in the list matches on of the output of the model (ie main, mass, peak, chromatogram)
+                      Take the first item in the list if only the main prediction is desired
+                      Probability
     '''
-    print('===============\nPredictions:')
     K.clear_session()
     predict_time = time.time()
     ### Load model
@@ -111,10 +118,10 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
     print(loading)
     model = load_model(loading)
 
-    prediction = model.predict(prediction_data, verbose = verbose)
+    predictions = model.predict(prediction_data, verbose = verbose)
     
     if predictions_save_name is not None and comparisons is not None:
-        predictions_df = pd.DataFrame(np.concatenate((comparisons, np.squeeze(prediction).T), axis = 1))
+        predictions_df = pd.DataFrame(np.concatenate((comparisons, np.squeeze(predictions).T), axis = 1))
         if predictions_df.shape[1] == 6:
             predictions_df.columns = ['x1', 'x2', 'probability', 'prob_mass', 'prob_peak', 'prob_chrom']
         else:
@@ -123,10 +130,8 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
         predictions_df['x2'] = predictions_df['x2'].astype(int)
         predictions_df.to_csv(predictions_save_name, index = None)
 
-#    prediction = prediction[0]  # Only take the main outcome
-
     print('Time to predict: {:.2f} sec'.format(time.time() - predict_time))
-    return prediction
+    return predictions
 
 
 

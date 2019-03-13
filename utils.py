@@ -470,32 +470,48 @@ def alignTimes(groups, info_df, peak_intensity, align_to):
         info_df.loc[group, align_to] = average_time
     
 
-def printConfusionMatrix(prediction, info_df, comparisons):
+def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, calculate_for_components = True, print_metrics = True):
+    metrics = []
+    
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
-    p = np.round(prediction).astype(int).reshape((-1))
     g1 = info_df.loc[x1]['Group'].values
     g2 = info_df.loc[x2]['Group'].values
-
     keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
     truth = (g1 == g2)
     truth_ignore_neg = (g1[keep] == g2[keep])
-    p_ignore_neg = p[keep]
-
-    print('True positives: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(truth_ignore_neg), np.mean(p_ignore_neg[truth_ignore_neg])))
-    print('False positives - ignore negative indices: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[~truth_ignore_neg]), np.sum(~truth_ignore_neg), np.mean(p_ignore_neg[~truth_ignore_neg])))
-    print('False positives: {} / {} = {:.3f}'.format(np.sum(p[~truth]), np.sum(~truth), np.mean(p[~truth])))
     
-    TP = np.mean(p_ignore_neg[truth_ignore_neg])
-    FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])
-    FP = np.mean(p[~truth])
-
-    recall = TP
-    precision = np.sum(p_ignore_neg[truth_ignore_neg]) / np.sum(p_ignore_neg)
-    f1 = 2 * (precision * recall) / (precision + recall)
+    if calculate_for_components:
+        names = ['chromatogram', 'mass', 'main']
+        if len(predictions) == 4:
+            names[1:1] = ['peak']
+    elif type(predictions) is not list:
+        predictions = [predictions]
+            
+    for prediction in predictions:
+        p = np.round(prediction).astype(int).reshape((-1))
+        p_ignore_neg = p[keep]
     
-    print('Recall: {:.3f}'.format(recall))
-    print('Precision: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(p_ignore_neg), precision))
-    print('F1: {:.3f}'.format(f1))
+        TP = np.mean(p_ignore_neg[truth_ignore_neg])
+        FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])
+        FP = np.mean(p[~truth])
+        metrics.extend([TP, FP_ignore_neg, FP])
+        
+        if print_metrics:
+            if calculate_for_components:
+                print('\nMetrics from', names.pop(), 'output:')
+            print('True positives: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(truth_ignore_neg), np.mean(p_ignore_neg[truth_ignore_neg])))
+            print('False positives - ignore negative idx: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[~truth_ignore_neg]), np.sum(~truth_ignore_neg), np.mean(p_ignore_neg[~truth_ignore_neg])))
+            print('False positives: {} / {} = {:.3f}'.format(np.sum(p[~truth]), np.sum(~truth), np.mean(p[~truth])))
+    
+        if calculate_f1:
+            recall = TP
+            precision = np.sum(p_ignore_neg[truth_ignore_neg]) / np.sum(p_ignore_neg)
+            f1 = 2 * (precision * recall) / (precision + recall)
+            metrics.extend([recall, precision, f1])
+            if print_metrics:
+                print('Recall: {:.3f}'.format(recall))
+                print('Precision: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(p_ignore_neg), precision))
+                print('F1: {:.3f}'.format(f1))
 
-    return (TP, FP_ignore_neg, FP, recall, precision, f1)
+    return metrics

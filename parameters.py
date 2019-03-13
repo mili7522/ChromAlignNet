@@ -49,14 +49,17 @@ prediction_options = {
     'ignore_negatives': False,  # Ignore groups assigned with a negative index?
     'time_cutoff': 3, # Three minutes
     'predictions_save_name': None,
-    'results_path': 'results/Individual',
+    'results_path': 'results',
 
     'model_path': 'SavedModels/',
     'model_file': 'ChromAlignNet-H-32-r03',
     'data_path': training_options['datasets'][9],
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
-    'real_groups_available': True
+    'real_groups_available': True,
+    'plot_alignment': True,
+    'calculate_f1_metric': False,
+    'calculate_metrics_for_components': False
 }
 
 prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(prediction_options['results_path'], prediction_options['model_file'], getDatasetName(prediction_options['data_path']))
@@ -65,7 +68,9 @@ prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(p
 batch_prediction_options = {
     'save_names': ["ModelTests-On{}.csv".format(getDatasetName(x)) for x in training_options['datasets']],
     'model_repeats': range(1,11),
-    'model_names': ['G'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
-    'model_variants': [1], #[20, 21, 26], # range(1, 28),
-    'verbose_prediction' : 0
+    'model_names': ['H'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
+    'model_variants': [2], #[20, 21, 26], # range(1, 28),
+    'verbose_prediction' : 0,
+    'save_individual_predictions': True,
+    'individual_predictions_save_path': 'Individual'
 }

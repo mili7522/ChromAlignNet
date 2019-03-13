@@ -1,17 +1,12 @@
 import pandas as pd
+import numpy as np
 import os
-#import matplotlib.pyplot as plt
-#import matplotlib.colors as colors
 import time
-#import numpy as np
-#import itertools
 import sys
-#import keras.backend as K
-#from keras.models import load_model
-from PredictChromAlignNet import prepareDataForPrediction, runPrediction, getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix
-from utils import getRealGroupAssignments
-from parameters import prediction_options, training_options, batch_prediction_options
+from PredictChromAlignNet import prepareDataForPrediction, runPrediction
+from parameters import prediction_options, training_options, batch_prediction_options, getDatasetName
 from model_definition import getModelVariant
+from utils import calculateMetrics
 
 
 ### Options
@@ -19,16 +14,18 @@ model_path = prediction_options.get('model_path')
 data_paths = training_options.get('datasets')
 model_prefix = 'ChromAlignNet-'
 results_path = prediction_options.get('results_path')
-real_groups_available = prediction_options.get('real_groups_available')
+
+calculate_f1_metric = prediction_options.get('calculate_f1_metric')
+calculate_metrics_for_components = prediction_options.get('calculate_metrics_for_components')
 
 model_repeats = batch_prediction_options.get('model_repeats')
 model_variants = batch_prediction_options.get('model_variants')
 model_names =  batch_prediction_options.get('model_names')  
 
 verbose_prediction = batch_prediction_options.get('verbose_prediction') 
+save_individual_predictions = batch_prediction_options.get('save_individual_predictions')
 
-
-j = int(sys.argv[1])
+dataset_number = int(sys.argv[1])
 
 # Second system input of repetition number, thus need to modify the save_name variable
 save_names = batch_prediction_options.get('save_names')
@@ -36,23 +33,23 @@ if len(sys.argv) > 2:
     repeat = int(sys.argv[2])
     save_name = os.path.join(results_path, 
                              'rep' + '{:02d}'.format(repeat) 
-                             + '-' + save_names[j])
+                             + '-' + save_names[dataset_number])
     model_repeats = [repeat]
 else:
-    save_name = os.path.join(results_path, save_names[j])
+    save_name = os.path.join(results_path, save_names[dataset_number])
 
-data_path = data_paths[j]
+data_path = data_paths[dataset_number]
 
-individual_predictions_save_path = 'Individual'
-os.makedirs(os.path.join(results_path, individual_predictions_save_path), exist_ok = True)
+if save_individual_predictions:
+    individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path')
+    results_path = os.path.join(results_path, individual_predictions_save_path)
+    os.makedirs(results_path, exist_ok = True)
 
 
 ### Load and pre-process data
-confusion_matrices = []
-prediction_times = []
-model_fullname_list = []  
-#model_variant_list = []      # no longer needed
-#model_name_list = []         # no longer needed
+metrics_list = []
+prediction_times_list = []
+model_fullname_list = []
 
 
 # XRW
@@ -66,6 +63,18 @@ print('Results will be saved to: ')
 print(save_name)
 sys.stdout.flush()
 
+
+# Determine names of metrics for dataframe
+metric_names = ['True Positives', 'False Positives - Ignore Neg Idx', 'False Positives']
+if calculate_f1_metric:
+    metric_names.extend(['Recall', 'Precision', 'F1'])
+    if calculate_metrics_for_components:
+        metric_names.extend(['TP-Mass', 'FP-IgnNeg-Mass', 'FP-Mass', 'Recall-Mass', 'Precision-Mass', 'F1-Mass',
+                             'TP-Peak', 'FP-IgnNeg-Peak', 'FP-Peak', 'Recall-Peak', 'Precision-Peak', 'F1-Peak',
+                             'TP-Chrom', 'FP-IgnNeg-Chrom', 'FP-Chrom', 'Recall-Chrom', 'Precision-Chrom', 'F1-Chrom'])
+elif calculate_metrics_for_components:
+    metric_names.extend(['TP-Mass', 'FP-IgnNeg-Mass', 'FP-Mass', 'TP-Peak', 'FP-IgnNeg-Peak', 'FP-Peak',
+                         'TP-Chrom', 'FP-IgnNeg-Chrom', 'FP-Chrom'])
 
 ### Predict
 # changed the order of the loops. variant first, so the data only need to be loaded once for the variant. model name, and then the repeats. 
@@ -85,32 +94,31 @@ for i in model_variants:
             print('---\nModel used: ', model_file)  
     
             model_fullname_list.append(name + '-' + '{:02d}'.format(i))  
-            # model_name_list.append(model_names[i+1])   # XRW -- for full models -- no longer needed
-            # model_variant_list.append(i)   # XRW -- for sub-models  -- no longer needed
             
-            predictions_save_name = '{}/{}/{}_{}_Prediction.csv'.format(results_path, individual_predictions_save_path, model_file, data_path.split('-')[1])  # TODO: Make saving optional?
+            if save_individual_predictions:
+                predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path, model_file, getDatasetName(data_path))
+            else:
+                predictions_save_name = None
             
             predict_time = time.time()
-            prediction_all = runPrediction(prediction_data, model_path, model_file, verbose = verbose_prediction,
+            predictions = runPrediction(prediction_data, model_path, model_file, verbose = verbose_prediction,
                                            predictions_save_name = predictions_save_name, comparisons = comparisons)
-            prediction = prediction_all[0]
             
-            print('Time to predict:', round((time.time() - predict_time)/60, 2), 'min')  # Duplicates what's inside runPrediction
-            prediction_times.append(round((time.time() - predict_time)/60, 2))
+            prediction_times_list.append(round((time.time() - predict_time)/60, 2))  # Currently in minutes
             
-            ### 
-            confusion_matrices.append(printConfusionMatrix(prediction, info_df, comparisons) + 
-                                      printConfusionMatrix(prediction_all[1], info_df, comparisons) + 
-                                      printConfusionMatrix(prediction_all[2], info_df, comparisons))  # TODO: Make this more general
-            sys.stdout.flush()  
+            ###
+            metrics = calculateMetrics(predictions, info_df, comparisons, calculate_f1 = calculate_f1_metric,
+                                       calculate_for_components = calculate_metrics_for_components, print_metrics = True)
+            if calculate_metrics_for_components and ignore_peak_profile:  # Modify the returned metrics to include nan values for peak encoder
+                if calculate_f1_metric:
+                    metrics[12:12] = [np.nan] * 6
+                else:
+                    metrics[6:6] = [np.nan] * 3
+            metrics_list.append(metrics)
+            sys.stdout.flush()
             
-
-        cm_df = pd.DataFrame(confusion_matrices, columns = ['True Positives', 'False Positives - Ignore Neg Idx', 'False Positives', 'Recall', 'Precision', 'F1',
-                                                            'TP-Mass', 'FP-IgnNeg-Mass', 'FP-Mass', 'Recall-Mass', 'Precision-Mass', 'F1-Mass',
-                                                            'TP-Chrom', 'FP-IgnNeg-Chrom', 'FP-Chrom', 'Recall-Chrom', 'Precision-Chrom', 'F1-Chrom'])  # TODO: Generalise
-        df = pd.concat([cm_df, pd.DataFrame(prediction_times, columns = ['Prediction Times'])], axis = 1)
-        # df['Model Name']   # no longer needed
-        # df['Model Variant'] = model_variant_list   # no longer needed
+        df = pd.DataFrame(metrics_list, columns = metric_names)
+        df['Prediction Times'] = prediction_times_list
         df['Model Name'] = model_fullname_list
         df.to_csv(save_name)
 

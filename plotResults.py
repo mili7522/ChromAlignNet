@@ -1,22 +1,18 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import os
 from utils import loadData, plotSpectrumTogether, plotPeaksTogether, getRealGroupAssignments
-from utils import getDistanceMatrix, assignGroups, alignTimes, printConfusionMatrix, postprocessGroups
-from parameters import prediction_options
+from utils import getDistanceMatrix, assignGroups, alignTimes, calculateMetrics, postprocessGroups
+from parameters import prediction_options, batch_prediction_options
 
 data_path = prediction_options.get('data_path')
 info_file = prediction_options.get('info_file')
 sequence_file = prediction_options.get('sequence_file')
 real_groups_available = prediction_options.get('real_groups_available')
+prediction_file = prediction_options.get('predictions_save_name')
 
-info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
-
-
-def plotAlignments():
-    prediction_file = prediction_options.get('predictions_save_name')
-    prediction = pd.read_csv(prediction_file, usecols = [2]).values
-    comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity):
 
     distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 50, info_df = info_df)
     groups = assignGroups(distance_matrix, threshold = 2)
@@ -25,7 +21,7 @@ def plotAlignments():
     if real_groups_available:
         real_groups = getRealGroupAssignments(info_df)
         alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
-        printConfusionMatrix(prediction, info_df, comparisons)
+        calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False, calculate_f1 = True, print_metrics = True)
 
     plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
 #    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot')
@@ -34,7 +30,7 @@ def plotAlignments():
 
 
 
-def plotByIndex(index = None, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False):
+def plotPeaksByIndex(index = None, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False):
     if plot_as_subplots:
         fig, axes = plt.subplots(2,2)
     else:
@@ -151,10 +147,6 @@ def plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_nega
         idx_arrangement = info_df.sort_values('peakMaxTime').index
     idx_arrangement_dict = dict(zip(idx_arrangement, range(len(idx_arrangement)) ))
     
-    prediction_file = prediction_options.get('predictions_save_name')
-    prediction = pd.read_csv(prediction_file, usecols = [2]).values
-    comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
-    
     number_of_peaks = len(info_df)
     
     prediction_matrix = np.zeros((number_of_peaks, number_of_peaks))
@@ -198,8 +190,20 @@ def plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_nega
 
 
 if __name__ == "__main__":
-#    plotAlignments()
-#    plotByIndex([2,10,17])
+    info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
+    
+    try:
+        prediction = pd.read_csv(prediction_file, usecols = [2]).values
+        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+    except FileNotFoundError:
+        results_path = prediction_options.get('results_path')
+        individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path')
+        prediction_file = os.path.join(results_path, individual_predictions_save_path, prediction_file.lstrip('results/') )
+        prediction = pd.read_csv(prediction_file, usecols = [2]).values
+        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+    
+    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
+#    plotPeaksByIndex([2,10,17])
 #    plotPerformanceByModel('results/ModelTests-OnField73.csv')
-    plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_negative_group = True)
+#    plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_negative_group = True)
 
