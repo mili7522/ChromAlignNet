@@ -485,8 +485,11 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
         names = ['chromatogram', 'mass', 'main']
         if len(predictions) == 4:
             names[1:1] = ['peak']
-    elif type(predictions) is not list:
-        predictions = [predictions]
+    else:
+        if type(predictions) is not list:
+            predictions = [predictions]
+        else:
+            predictions = [predictions[0]]
             
     for prediction in predictions:
         p = np.round(prediction).astype(int).reshape((-1))

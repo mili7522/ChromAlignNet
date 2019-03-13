@@ -146,7 +146,7 @@ if __name__ == "__main__":
     prediction = predictions[0]
 
     if real_groups_available:
-        calculateMetrics(prediction, info_df, comparisons, calculate_for_components = calculate_metrics_for_components, calculate_f1 = calculate_f1_metric, print_metrics = True)
+        calculateMetrics(predictions, info_df, comparisons, calculate_for_components = calculate_metrics_for_components, calculate_f1 = calculate_f1_metric, print_metrics = True)
     
     if plot_alignment:
         plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = False)
