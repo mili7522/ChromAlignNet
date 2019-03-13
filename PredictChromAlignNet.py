@@ -5,8 +5,8 @@ import sys
 import os
 import keras.backend as K
 from keras.models import load_model
-from utils import loadData, getChromatographSegmentDf, generateCombinationIndices, getRealGroupAssignments#, plotSpectrumTogether, plotPeaksTogether
-from utils import getDistanceMatrix, assignGroups, alignTimes, calculateMetrics
+from utils import loadData, getChromatographSegmentDf, generateCombinationIndices, calculateMetrics
+from plotResults import plotAlignments
 from model_definition import getModelVariant
 from parameters import prediction_options
 
@@ -22,6 +22,7 @@ results_path = prediction_options.get('results_path')
 
 calculate_f1_metric = prediction_options.get('calculate_f1_metric')
 calculate_metrics_for_components = prediction_options.get('calculate_metrics_for_components')
+plot_alignment = prediction_options.get('plot_alignment')
 ###
 
 ### These parameter are loaded individually in any batch prediction scripts, since they may change per model / data source
@@ -141,27 +142,12 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
 
 if __name__ == "__main__":
     prediction_data, comparisons, info_df, peak_df_orig, peak_intensity = prepareDataForPrediction(data_path, ignore_peak_profile)
-    prediction_all = runPrediction(prediction_data, model_path, model_file, predictions_save_name = predictions_save_name, comparisons = comparisons)
-    prediction = prediction_all[0]
+    predictions = runPrediction(prediction_data, model_path, model_file, predictions_save_name = predictions_save_name, comparisons = comparisons)
+    prediction = predictions[0]
 
-    distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 50)
-
-    groups = assignGroups(distance_matrix, threshold = 2)
-
-    alignTimes(groups, info_df, peak_intensity, 'AlignedTime')
     if real_groups_available:
-        real_groups = getRealGroupAssignments(info_df)
-        printConfusionMatrix(prediction, info_df, comparisons)
-        alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
+        calculateMetrics(prediction, info_df, comparisons, calculate_for_components = calculate_metrics_for_components, calculate_f1 = calculate_f1_metric, print_metrics = True)
+    
+    if plot_alignment:
+        plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = False)
 
-
-# TODO: Add option to control plotting
-#    if ignore_negatives:
-#        plotSpectrumTogether(info_df[info_df['Group'] >= 0], peak_intensity[info_df['Group'] >= 0], with_real = real_groups_available)
-#    else:
-#        plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available)
-#
-#    if ignore_negatives:
-#        plotPeaksTogether(info_df[info_df['Group'] >= 0], peak_df_orig[info_df['Group'] >= 0], with_real = real_groups_available)
-#    else:
-#        plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available)

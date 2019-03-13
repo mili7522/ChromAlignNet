@@ -11,8 +11,10 @@ info_file = prediction_options.get('info_file')
 sequence_file = prediction_options.get('sequence_file')
 real_groups_available = prediction_options.get('real_groups_available')
 prediction_file = prediction_options.get('predictions_save_name')
+calculate_f1_metric = prediction_options.get('calculate_f1_metric')
+calculate_metrics_for_components = prediction_options.get('calculate_metrics_for_components')
 
-def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity):
+def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = True):
 
     distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 50, info_df = info_df)
     groups = assignGroups(distance_matrix, threshold = 2)
@@ -21,7 +23,8 @@ def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensit
     if real_groups_available:
         real_groups = getRealGroupAssignments(info_df)
         alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
-        calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False, calculate_f1 = True, print_metrics = True)
+        if print_metrics:
+            calculateMetrics(prediction, info_df, comparisons, calculate_for_components = calculate_metrics_for_components, calculate_f1 = calculate_f1_metric, print_metrics = True)
 
     plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
 #    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot')
