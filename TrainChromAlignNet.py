@@ -56,6 +56,10 @@ else:
     model_variant = 1
 
 
+if os.path.isdir(model_path) == False:
+    os.makedirs(model_path)
+
+
 chrom_align_model = getModelVariant(model_variant)
 buildModel = getattr(chrom_align_model, 'buildModel')
 ignore_peak_profile = getattr(chrom_align_model, 'ignore_peak_profile')
@@ -74,6 +78,8 @@ if random_seed_type == 3:
         lines = f.readlines()
         random_seed = lines[-1][:-1]  # Ignore last \n character
 
+with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'a') as f:
+    f.write('%d\n' % random_seed)
 
 if train_with_gpu:
     config = tf.ConfigProto()
@@ -93,7 +99,6 @@ data_chrom_seg_1 = []
 data_chrom_seg_2 = []
 data_y = []
 
-
 for data_path in data_paths:
     print('Loading:', data_path)
     info_df, peak_df, mass_profile_df, chromatogram_df, _, _ = loadData(data_path, info_file, sequence_file)
@@ -104,17 +109,12 @@ for data_path in data_paths:
         keep_index = keep_index & (info_df['Group'] >= 0)
     if not ignore_peak_profile:
         keep_index = keep_index & (pd.notnull(peak_df).all(1))
-    # info_df = info_df[keep_index]
-    # peak_df = peak_df[keep_index]
-    # mass_profile_df = mass_profile_df[keep_index]
 
-    # info_df.reset_index(inplace = True, drop = True)
-    # peak_df.reset_index(inplace = True, drop = True)
-    # mass_profile_df.reset_index(inplace = True, drop = True)
-
-    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
 
+    chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
+    
+    # Generate data combinations
     prev_len = len(data_y)
     x1, x2, y = generateCombinationIndices(info_df[keep_index], time_cutoff = None, return_y = True, random_seed = random_seed)
     data_time_1.extend(info_df.loc[x1]['peakMaxTime'])
@@ -129,7 +129,7 @@ for data_path in data_paths:
     data_y.extend(y)
     print(len(data_y) - prev_len, 'combinations generated')
     
-### Shuffle data
+# Shuffle data
 np.random.seed(random_seed)
 shuffle_index = np.random.permutation(len(data_time_1))
 data_time_1 = np.array(data_time_1)[shuffle_index]
@@ -146,27 +146,32 @@ data_mass_spectrum_2 = np.array(pd.concat(data_mass_spectrum_2))[shuffle_index]
 data_chrom_seg_1 = np.array(pd.concat(data_chrom_seg_1))[shuffle_index]
 data_chrom_seg_2 = np.array(pd.concat(data_chrom_seg_2))[shuffle_index]
 data_y = np.array(data_y)[shuffle_index]
+data_time_diff = np.abs(data_time_2 - data_time_1)
 
-
-
+# Print data dimensions
 samples, segment_length = data_chrom_seg_1.shape
 _, max_mass_seq_length = data_mass_spectrum_1.shape
-
 print('Number of samples:', samples)
 if not ignore_peak_profile:
     _, max_peak_seq_length = data_peak_1.shape
     print('Max peak length:', max_peak_seq_length)
-print('Chromatogram segment length:', segment_length)
 print('Mass spectrum length:', max_mass_seq_length)
-sys.stdout.flush() 
+print('Chromatogram segment length:', segment_length)
+sys.stdout.flush()
 
 
-if os.path.isdir(model_path) == False:
-    os.makedirs(model_path)
+training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
+                 data_chrom_seg_1.reshape((samples, segment_length, 1)),
+                 data_chrom_seg_2.reshape((samples, segment_length, 1)),
+                 data_time_diff]
 
-with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'a') as f:
-    f.write('%d\n' % random_seed)
+if not ignore_peak_profile:  # Insert peak data
+    training_data[2:2] = [data_peak_1.reshape((samples, max_peak_seq_length, 1)),
+                          data_peak_2.reshape((samples, max_peak_seq_length, 1))]
 
+
+###
+    
 # Check if existing checkpoints are present - if so then load and resume training from last epoch
 checkpoint_path = os.path.join(model_path, model_name + '-Checkpoint')
 if os.path.isdir(checkpoint_path) and os.listdir(checkpoint_path):
@@ -200,16 +205,6 @@ if save_checkpoints:
     callbacks = [checkpoint] + ([logger] if logger is not None else [])
 else:
     callbacks = [logger] if logger is not None else None
-
-
-training_data = [data_mass_spectrum_1, data_mass_spectrum_2,
-                 data_chrom_seg_1.reshape((samples, segment_length, 1)),
-                 data_chrom_seg_2.reshape((samples, segment_length, 1)),
-                 np.abs(data_time_2 - data_time_1)]
-
-if not ignore_peak_profile:  # Insert peak data
-    training_data[2:2] = [data_peak_1.reshape((samples, max_peak_seq_length, 1)),
-                          data_peak_2.reshape((samples, max_peak_seq_length, 1))]
 
 
 history = model.fit(training_data,
