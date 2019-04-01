@@ -192,21 +192,111 @@ def plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_nega
         plt.ylabel('Min')
 
 
+
+def printLastValues(history, std = None, kind = 'loss'):
+    """
+    Prints to the console the last values of the history
+    
+    Arguments:
+        
+    """
+    def formatHistoryLabels(label):
+        if label == 'loss':
+            return 'Total Loss'
+        label_components = label.split('_')
+        output = []
+        if label_components[0] == 'val':
+            output.append('Validation')
+        output.append(label_components[-3].capitalize())
+        if label_components[-3] != 'main':
+            output.append('Encoder')
+        output.append('Loss' if label_components[-1] == 'loss' else 'Accuracy')
+        
+        return ' '.join(output)
+    
+    print("Last Values:")
+    if isinstance(kind, str):
+        kind = [kind]
+    formatted_labels = []
+    for k in kind:
+        end = ' ± {:.4f}'.format(std.iloc[-1][k]) if std is not None else ""
+        formatted_labels.append(formatHistoryLabels(k))
+        print('{}: {:.4f}'.format(formatted_labels[-1], history.iloc[-1][k]) + end)
+    return formatted_labels
+
+
+def plotHistory(kind = 'loss', all_reps = False):
+    """
+    kind - string or list
+    options are:
+        loss
+        main_prediction_loss, mass_prediction_loss, peak_prediction_loss, chromatogram_prediction_loss,
+        val_main_prediction_loss, val_mass_prediction_loss, val_peak_prediction_loss, val_chromatogram_prediction_loss,
+        main_prediction_acc, mass_prediction_acc, peak_prediction_acc, chromatogram_prediction_acc,
+        val_main_prediction_acc, val_mass_prediction_acc, val_peak_prediction_acc, val_chromatogram_prediction_acc
+    """
+    if kind == 'acc':
+        kind = ['main_prediction_acc', 'val_main_prediction_acc']
+    if isinstance(kind, str):
+        kind = [kind]
+    if all_reps:
+        histories = []
+        for rep in range(1,11):
+            f = '{}/{}-r{:02}-History.csv'.format(prediction_options['model_path'], prediction_options['model_file'][:-4], rep)
+            df = pd.read_csv(f, index_col = 0)
+            histories.append(df)
+        df = pd.concat(histories, axis = 0)
+        g = df.groupby(df.index)
+        history = g.mean()
+        std = g.std()
+        formatted_labels = printLastValues(history, std, kind = kind)
+        error_kw = {'elinewidth': 1, 'capthick': 1, 'capsize': 2, 'errorevery': len(history) // 50}
+    else:
+        history_file = '{}/{}-History.csv'.format(prediction_options['model_path'], prediction_options['model_file'])
+        history = pd.read_csv(history_file, index_col = 0)
+        formatted_labels = printLastValues(history, None, kind = kind)
+        error_kw = {}
+    history[kind].plot(linewidth = 2, yerr = std[kind] if all_reps else None, **error_kw)
+    plt.legend(formatted_labels)
+    plt.xlabel('Epochs')
+
+
+def plotSubnetworkHistory(kind = 'acc', all_reps = False):
+    """
+    Plots the history of each sub-network using the plotHistory function
+    
+    Arguments:
+        kind
+        all_reps -- If True, 
+    """
+    if kind.endswith('acc'):
+        k = ['main_prediction_acc', 'mass_prediction_acc', 'peak_prediction_acc', 'chromatogram_prediction_acc']
+    if kind.endswith('loss'):
+        k = ['main_prediction_loss', 'mass_prediction_loss', 'peak_prediction_loss', 'chromatogram_prediction_loss']
+    if kind.startswith('val'):
+        k = ['val_' + i for i in k]
+    plotHistory(k, all_reps)
+    plt.ylabel('Accuracy' if kind.endswith('acc') else 'Loss')
+
+
 if __name__ == "__main__":
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
     
-    try:
-        prediction = pd.read_csv(prediction_file, usecols = [2]).values
-        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
-    except FileNotFoundError:
-        results_path = prediction_options.get('results_path')
-        individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path')
-        prediction_file = os.path.join(results_path, individual_predictions_save_path, prediction_file.lstrip('results/') )
-        prediction = pd.read_csv(prediction_file, usecols = [2]).values
-        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+#    try:
+#        prediction = pd.read_csv(prediction_file, usecols = [2]).values
+#        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+#    except FileNotFoundError:
+#        results_path = prediction_options.get('results_path')
+#        individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path')
+#        prediction_file = os.path.join(results_path, individual_predictions_save_path, prediction_file.lstrip('results/') )  # TODO: Improve?
+#        prediction = pd.read_csv(prediction_file, usecols = [2]).values
+#        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
     
-    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
-#    plotPeaksByIndex([2,10,17])
+    
+#    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
+#    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
 #    plotPerformanceByModel('results/ModelTests-OnField73.csv')
 #    plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_negative_group = True)
+#    plotHistory('loss', True)
+    plotSubnetworkHistory('val_acc', False)
 
