@@ -6,26 +6,30 @@ import os
 import scipy.spatial
 import scipy.cluster
 
+### Loading and preparing data
+
 def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'WholeSequence.csv', take_chromatogram_log = True):
-    ''' Loads data into pandas dataframes
-    Output:
-        info_df - Dataframe of peak information. Number of rows = number of peaks
+    """
+    Loads data into pandas dataframes
+    
+    Arguments:
+        data_path -- String: Path of data folder
+        info_file -- String: Name of the file which will be loaded into info_df
+        sequence_file -- String: Name of the file which contains the whole chromatogram sequences for all files
+        take_chromatogram_log - Boolean: whether the chromatogram_df is transformed by taking the log (base 2)
+    
+    Returns:
+        info_df -- Dataframe of peak information. Number of rows = number of peaks
                   Columns are peak number, times (start, end and max value), file number, mass number and group number (if one is assigned)
                   Peak number is assigned from 0 within each chromatogram file
-        peak_df - Dataframe of the peak profile of each peak. Normalised to max of 1. Number of rows = number of peaks
+        peak_df -- Dataframe of the peak profile of each peak. Normalised to max of 1. Number of rows = number of peaks
                   Each peak is assumed to be in its own .txt file, as created by the 'ExtractPeaksAndMass.py' script
-        mass_profile_df - Dataframe of the mass spectrum associated with each peak's time of max value.
+        mass_profile_df -- Dataframe of the mass spectrum associated with each peak's time of max value.
                   Each mass spectrum is assumed to be in its own .tsv file, as created by the 'ExtractPeaksAndMass.py' script
-        chromatogram_df - Dataframe of each file's whole chromatogram. Number of rows = number of files
-        peak_df_orig - Unnormalised peak_df
-        peak_intensity - Max chromatogram reading from each peak. Number of rows = number of peaks
-
-    Keyword arguments:
-        data_path - String: Path of data folder
-        info_file - String: Name of the file which will be loaded into info_df
-        sequence_file - String: Name of the file which contains the whole chromatogram sequences for all files
-        take_chromatogram_log - Boolean: whether the chromatogram_df is transformed by taking the log (base 2)
-    '''
+        chromatogram_df -- Dataframe of each file's whole chromatogram. Number of rows = number of files
+        peak_df_orig -- Unnormalised peak_df
+        peak_intensity -- Max chromatogram reading from each peak. Number of rows = number of peaks
+    """
     info_df = pd.read_csv(os.path.join(data_path, info_file), index_col = 0)
     info_df.dropna(axis = 1, how = 'all', inplace = True)  # Some empty columns are sometimes imported. Drop these
     chromatogram_df = pd.read_csv(os.path.join(data_path, sequence_file), index_col = 0)
@@ -89,15 +93,17 @@ def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'W
 
 
 def getChromatographSegmentDf(info_df, chromatogram_df, segment_length):
-    ''' Generates a DataFrame of chromatogram segments
-    Outputs:
-        chrom_seg_df - DataFrame containing chromatogram segments centred at each peak, extracted from the corresponding unaligned chromatograms
+    """
+    Generates a DataFrame of chromatogram segments
 
-    Keyword arguments:
-        info_df - DataFrame containing information about each peak, in particular the peak time and the file number
-        chromatogram_df - DataFrame containing the full chromatograms from all files. Column titles are the times of each measurement
-        segment_length - Int: total length of the resulting chromatogram segments
-    '''
+    Arguments:
+        info_df -- DataFrame containing information about each peak, in particular the peak time and the file number
+        chromatogram_df -- DataFrame containing the full chromatograms from all files. Column titles are the times of each measurement
+        segment_length -- Int: total length of the resulting chromatogram segments
+    
+    Returns:
+        chrom_seg_df -- DataFrame containing chromatogram segments centred at each peak, extracted from the corresponding unaligned chromatograms
+    """
     peaks = len(info_df)  # Number of peaks
     chrom_seg_df = np.zeros((peaks, segment_length))
     peak_times = info_df['peakMaxTime']  # Peak time is defined as the time of maximum peak intensity
@@ -120,19 +126,22 @@ def getChromatographSegmentDf(info_df, chromatogram_df, segment_length):
     return pd.DataFrame(chrom_seg_df)
 
 
-    ''' Generates pairwise training examples
-    Outputs:
-        comparisons - Numpy array. May be returned as two columns - x1 and x2
 def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, random_seed = None, ignore_same_sample = False):
-                      Contains the peak IDs of the two pairwise peaks. The peak ID is gives by the corresponding row index in info_df
-        y - Only returned if return_y is true. A Numpy array equal to 1 where the two peaks belong to the same group, or 0 otherwise
+    """
+    Generates pairwise training examples
 
-    Keyword arguments:
-        info_df - DataFrame of peak information
-        time_cutoff - Int or Float: maximum time (min) between two pairwise peaks to still be considered a valid training/testing example
-        return_y - Boolean: To return y (for training) or not return y (for prediction)
-        random_seed - Int
-    '''
+    Arguments:
+        info_df -- DataFrame of peak information
+        time_cutoff -- Int or Float: maximum time (min) between two pairwise peaks to still be considered a valid training/testing example
+        return_y -- Boolean: To return y (for training) or not return y (for prediction)
+        random_seed -- Int
+        ignore_same_sample -- If True, removes comparisons between peaks originating from the same sample
+        
+    Returns:
+        comparisons -- Numpy array. May be returned as two columns - x1 and x2
+                      Contains the peak IDs of the two pairwise peaks. The peak ID is gives by the corresponding row index in info_df
+        y -- Only returned if return_y is true. A Numpy array equal to 1 where the two peaks belong to the same group, or 0 otherwise
+    """
     if random_seed is not None:
         # Set seed to either ensure randomness or to get the same dataset when continuing training from checkpoint
         np.random.seed(random_seed)
@@ -151,8 +160,8 @@ def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, ran
     if ignore_same_sample:
         x1_file = info_df.loc[comparisons[:,0]]['File'].values
         x2_file = info_df.loc[comparisons[:,1]]['File'].values
-        different_file = x1_file != x2_file
-        comparisons = comparisons[different_file]
+        different_sample = x1_file != x2_file
+        comparisons = comparisons[different_sample]
 
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
@@ -200,12 +209,16 @@ def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, ran
     else:
         return comparisons
 
-
 def getRealGroupAssignments(info_df):
-    ''' Identifies the group which has been manually assigned to each peak
-    Outputs:
-        group - Dictionary of group IDs, each containing a set of the peaks belonging to that group (peak ID given by the row index of the peak)
-    '''
+    """
+    Identifies the group which has been manually assigned to each peak (ground truth)
+    
+    Arguments:
+        info_df -- DataFrame containing information about each peak
+    
+    Returns:
+        group -- Dictionary of group IDs, each containing a set of the peaks belonging to that group (peak ID given by the row index of the peak)
+    """
     groups = {}
     for group, indexes in info_df.groupby('Group').groups.items():
         if group < 0: continue  # Don't align negative groups. Leave them with their original times
@@ -213,23 +226,26 @@ def getRealGroupAssignments(info_df):
     return groups
 
 
+### Plotting
 def plotSpectrum(times, files, peak_intensity, resolution = 1/300, buffer = 5,
                  min_time = None, max_time = None, ax = None, clip = 1E4):
-    ''' Plots the spectrum of peak across the different chromatograms
-    Output:
-        pcm - matplotlib axis
+    """
+    Plots the spectrum of peak across the different chromatograms
     
-    Keyword arguments:
-        times - pandas Series giving the times of the peaks
-        files - pandas Series of the file each peak belonged to
-        peak_intensity - pandas Series of the maximum values of each peak
-        resolution - minutes per time index step for the chromatogram
-        buffer - Int: Extra time steps to add to each end of the spectrum output
-        min_time - Float: Minumum time to draw the spectrum from (excluding buffer). Helps align several spectrum together
-        max_time - Float: Maximum time to draw the spectrum from (excluding buffer)
-        ax - matplotlib axis to draw the spectrum into
-        clip - Int or Float: Maximum value of the intensity. Values above this are clipped
-    '''
+    Arguments:
+        times -- pandas Series giving the times of the peaks
+        files -- pandas Series of the file each peak belonged to
+        peak_intensity -- pandas Series of the maximum values of each peak
+        resolution -- minutes per time index step for the chromatogram
+        buffer -- Int: Extra time steps to add to each end of the spectrum output
+        min_time -- Float: Minumum time to draw the spectrum from (excluding buffer). Helps align several spectrum together
+        max_time -- Float: Maximum time to draw the spectrum from (excluding buffer)
+        ax -- matplotlib axis to draw the spectrum into
+        clip -- Int or Float: Maximum value of the intensity. Values above this are clipped
+        
+    Returns:
+        pcm - matplotlib axis
+    """
     if min_time is None:
         min_time = min(times)
     timeIndex = np.round((times - min_time) / resolution).astype(int)
@@ -260,13 +276,15 @@ def plotSpectrum(times, files, peak_intensity, resolution = 1/300, buffer = 5,
     return pcm
 
 def plotSpectrumTogether(info_df, peak_intensity, with_real = False, save_name = None):
-    ''' Plots several spectra stacked together, to compare the prediction output with the input and groundtruth
-    Keyword arguments:
-        info_df - DataFrame containing information about each peak, including aligned and unaligned peak times and file number
-        peak_intensity - pandas Series of the maximum values of each peak
-        with_real - Boolean: To include the groundtruth as a third spectrum or not
-        save_name - None or String: Name to save the figure
-    '''
+    """
+    Plots several spectra stacked together, to compare the prediction output with the input and groundtruth
+    
+    Arguments:
+        info_df -- DataFrame containing information about each peak, including aligned and unaligned peak times and file number
+        peak_intensity -- pandas Series of the maximum values of each peak
+        with_real -- If True, include the groundtruth as a third spectrum (subplot)
+        save_name -- None or String: Name to save the figure
+    """
     # Get min_time and max_time to pass into each call of plotSpectrum, so that each spectrum is aligned
     min_time = min(info_df['startTime'])
     max_time = max(info_df['endTime'])
@@ -306,20 +324,22 @@ def plotSpectrumTogether(info_df, peak_intensity, with_real = False, save_name =
 
 
 def plotPeaks(times, info_df, peak_df, min_time, max_time, resolution = 1/300, buffer = 10):
-    ''' Recreates chromatograms from the individual peaks, each at their associated times
-    Output:
-        peaks - 2D numpy array with each row as a reconstructed chromatogram
-        times - 1D numpy array of the times corresponding to each column of the peaks array
+    """
+    Recreates chromatograms from the individual peaks, each at their associated times
     
-    Keyword arguments:
-        times - pandas Series giving the times of the peaks
-        info_df - DataFrame containing information about each peak, including aligned and unaligned peak times and file number
-        peak_df - Dataframe of the peak profile of each peak
-        min_time - Float: Minumum time of the chromatogram (excluding buffer)
-        max_time - Float: Maximum time of the chromatogram (excluding buffer)
-        resolution - minutes per time index step for the chromatogram
-        buffer - Int: Extra time steps to add to each end of the output chromatogram
-    '''
+    Arguments:
+        times -- pandas Series giving the times of the peaks
+        info_df -- DataFrame containing information about each peak, including aligned and unaligned peak times and file number
+        peak_df -- Dataframe of the peak profile of each peak
+        min_time -- Float: Minumum time of the chromatogram (excluding buffer)
+        max_time -- Float: Maximum time of the chromatogram (excluding buffer)
+        resolution -- minutes per time index step for the chromatogram
+        buffer -- Int: Extra time steps to add to each end of the output chromatogram
+    
+    Returns:
+        peaks -- 2D numpy array with each row as a reconstructed chromatogram
+        times -- 1D numpy array of the times corresponding to each column of the peaks array
+    """
     number_of_files = info_df['File'].max() + 1
     time_steps = np.ceil((max_time - min_time) / resolution + buffer * 2).astype(int)
     peaks = np.zeros((time_steps, number_of_files))
@@ -339,14 +359,17 @@ def plotPeaks(times, info_df, peak_df, min_time, max_time, resolution = 1/300, b
 
 
 def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None, save_data = False):
-    ''' Plots several reconstructed chromatograms stacked together, to compare the prediction output with the input and groundtruth
-    Keyword arguments:
-        info_df - DataFrame containing information about each peak, including aligned and unaligned peak times and file number
-        peak_df - Dataframe of the peak profile of each peak
-        with_real - Boolean: To include the groundtruth as a third plot or not
-        save_name - None or String: Name to save the figure
-        save_data - False or True
-    '''
+    """
+    Plots several reconstructed chromatograms stacked together, to compare the prediction output with the input and groundtruth
+    
+    Arguments:
+        info_df -- DataFrame containing information about each peak, including aligned and unaligned peak times and file number
+        peak_df -- Dataframe of the peak profile of each peak
+        with_real -- Boolean: To include the groundtruth as a third plot or not
+        save_name -- None or String: Name to save the figure
+        save_data -- If True, all plot data are saved as csv files
+                     Time data for the x values and the unaligned, aligned, and ground truth intensities as y values
+    """
     # Get min_time and max_time to pass into each call of plotPeaks, so that each plot is aligned
     min_time = min(info_df['startTime'])
     max_time = max(info_df['endTime'])
@@ -400,15 +423,39 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None, sav
 
 ### Group and cluster
 def getDistances(prediction):
+    """
+    Turns a vector of probabilities into a vector of distances
+        
+    Arguments:
+        prediction -- Numpy array giving a column vector of probabilities (from main output of ChromAlignNet)
+    
+    Returns:
+        distances -- Numpy array giving a column vector of distances
+    """
     distances = 1 / prediction
     return distances
     
 
 def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_df = None):
+    """
+    Produces a matrix of distances between all peaks
+        
+    Arguments:
+        comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
+        number_of_peaks -- Int: Total number of peaks under consideration
+        prediction -- Numpy array giving a column vector of probabilities (from main output of ChromAlignNet)
+        clip -- Int or Float: Maximum value of the distance matrix
+        info_df -- DataFrame containing information about each peak, in particular the peak times and file number
+    
+    Returns:
+        distance_matrix -- 2D numpy array of distances between all peaks
+    """
     distances = getDistances(prediction)
     
     distance_matrix = np.empty((number_of_peaks, number_of_peaks))
     distance_matrix.fill(clip)  # Clip value
+    
+    probability_matrix = np.zeros((number_of_peaks, number_of_peaks))
     
     for i, (x1, x2) in enumerate(comparisons):
         if info_df is not None and info_df.loc[x1, 'File'] == info_df.loc[x2, 'File']:
@@ -418,19 +465,32 @@ def getDistanceMatrix(comparisons, number_of_peaks, prediction, clip = 10, info_
         else:
             val = min(distances[i], clip)
         distance_matrix[x1, x2] = distance_matrix[x2, x1] = val
+        probability_matrix[x1, x2] = probability_matrix[x2, x1] = prediction[i]
     
     for i in range(number_of_peaks):
         distance_matrix[i,i] = 0
+        probability_matrix[i,i] = 1
     
-    return distance_matrix
+    return distance_matrix, probability_matrix
 
 
-def assignGroups(distance_matrix, threshold = 2):
+def assignGroups(distance_matrix, threshold = 2, plot_dendrogram = False):
+    """
+    Assigns a group number to peaks based on what should be aligned together
+    
+    Arguments:
+        distance_matrix -- 2D numpy array of distances between all peaks
+        threshold -- Int or Float: Value to cut the dendrogram to obtain the clusters
+        plot_dendrogram -- Boolean: To create a new figure for a plot of the dendrogram
+    
+    Returns:
+        groups -- Dictionary with group ID as keys and sets of peak IDs for each group
+    """
     sqform = scipy.spatial.distance.squareform(distance_matrix)
     mergings = scipy.cluster.hierarchy.linkage(sqform, method = 'average')
-#    plt.figure()
-#    dn = scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3, color_threshold = threshold)
-#    plt.savefig(data_path + 'Dendrogram.png', dpi = 300, format = 'png', bbox_inches = 'tight')
+    if plot_dendrogram:
+        plt.figure()
+        scipy.cluster.hierarchy.dendrogram(mergings, leaf_font_size = 3, color_threshold = threshold)
     labels = scipy.cluster.hierarchy.fcluster(mergings, threshold, criterion = 'distance')
     
     groups = {}
@@ -440,6 +500,16 @@ def assignGroups(distance_matrix, threshold = 2):
     return groups
 
 def postprocessGroups(groups, info_df):
+    """
+    Adjusts the groups assigned to each peak
+    
+    Arguments:
+        groups -- Dictionary with group ID as keys and sets of peak IDs for each group
+        info_df -- DataFrame containing information about each peak, in particular the peak times and file number
+    
+    Returns:
+        new_groups -- Dictionary with new group ID as keys and sets of peak IDs for each group
+    """
     max_group = len(groups) - 1  # max(groups.keys())
     new_groups = {}
     for i, group in groups.items():
@@ -467,6 +537,16 @@ def postprocessGroups(groups, info_df):
             
 
 def alignTimes(groups, info_df, peak_intensity, align_to):
+    """
+    Creates a column in the info_df Dataframe with the aligned times of all peaks.
+    Aligns the peaks in each group according to the average time of their peakMaxTime, weighted by the peak intensity
+    
+    Arguments:
+        groups -- Dictionary with group ID as keys and sets of peak IDs for each group
+        info_df -- DataFrame containing information about each peak, in particular the peak times
+        peak_intensity -- pandas Series of peak intensities
+        align_to -- String: Giving the name of the new column in the info_df Dataframe which will contain the aligned times
+    """
     info_df[align_to] = info_df['peakMaxTime']
     for group in groups.values():
         times = info_df.loc[group, 'peakMaxTime']
@@ -476,7 +556,23 @@ def alignTimes(groups, info_df, peak_intensity, align_to):
         info_df.loc[group, align_to] = average_time
     
 
+### Measuring performance
 def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, calculate_for_components = True, print_metrics = True):
+    """
+    Calculates a list of metrics to track the performance of the predictions from the network
+    
+    Arguments:
+        predictions -- Numpy array or list of numpy arrays: Column vector(s) of probabilities (from output(s) of ChromAlignNet)
+        info_df -- DataFrame containing information about each peak, in particular the assigned group number
+        comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
+        calculate_f1 -- If True, calculates and returns the recall, precision and F1 metric
+        calculate_for_components -- If True, calculates the metrics for each sub-network as well as the main output
+                                    Needs the 'predictions' argument to be a list of numpy arrays containing all outputs from the network
+        print_metrics -- If True, the metrics are printed to the console as well as returned
+    
+    Returns:
+        metrics -- a list of metrics
+    """
     metrics = []
     
     x1 = comparisons[:,0]
@@ -492,7 +588,7 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
         if len(predictions) == 4:
             names[1:1] = ['peak']
     else:
-        if type(predictions) is not list:
+        if not isinstance(predictions, list):
             predictions = [predictions]
         else:
             predictions = [predictions[0]]

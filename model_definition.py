@@ -4,6 +4,9 @@ from keras.layers import Input, Dense, Dropout, Lambda, Concatenate, Subtract, C
 
 
 class ChromAlignModel:
+    """
+    Model definitions for ChromAlignNet. Specified and built using Keras
+    """
     def __init__(self, mass_network_neurons = 64, peak_network_neurons = 64, chromatogram_network_neurons = 64,
                  mass_encoder_neurons = 10, peak_encoder_neurons = 10, chromatogram_encoder_neurons = 10,
                  mass_dropout_percentage = 0.2, peak_dropout_percentage = 0.2, chromatogram_dropout_percentage = 0.2,
@@ -29,6 +32,9 @@ class ChromAlignModel:
         self.ignore_peak_profile = ignore_peak_profile
 
     def makeSiameseComponent(self, encoder_model, left_input, right_input):
+        """
+        Creates a Siamese sub-network given an encoder
+        """
         left_branch = encoder_model(left_input)
         right_branch = encoder_model(right_input)
         
@@ -132,7 +138,9 @@ class ChromAlignModel:
 
 
     def buildModel(self, max_mass_seq_length, segment_length):
-
+        """
+        Creates model
+        """
         mass_left_input, mass_right_input, mass_comparison, mass_prediction = self.buildMassSiamese(max_mass_seq_length)
         if not self.ignore_peak_profile:
             peak_left_input, peak_right_input, peak_comparison, peak_prediction = self.buildPeakSiamese()
@@ -156,12 +164,15 @@ class ChromAlignModel:
             inputs = [mass_left_input, mass_right_input, peak_left_input, peak_right_input, chromatogram_left_input, chromatogram_right_input, time_diff]
             outputs = [combined_prediction, mass_prediction, peak_prediction, chromatogram_prediction]
 
-        siamese_net = Model(inputs = inputs, outputs = outputs)
+        model = Model(inputs = inputs, outputs = outputs)
 
-        return siamese_net
+        return model
 
 
 class SimplifiedPeakEncoderVariant(ChromAlignModel):
+    """
+    Variant of ChromAlignModel with a simplified peak encoder
+    """
     def buildPeakEncoder(self):
         peak_input_shape = (None, 1)  # Variable sequence length
         P_in = Input(peak_input_shape)
@@ -181,6 +192,15 @@ class SimplifiedPeakEncoderVariant(ChromAlignModel):
 
 
 def getModelVariant(variant):
+    """
+    Creates a specific model object with pre-specified parameters matching one of the variants defined
+    
+    Arguments:
+        variant -- the model variant to select, given as an Int
+    
+    Returns:
+        model -- ChromAlignModel object constructed with specific parameters matching the variant requested    # model_obj?
+    """
     switcher = {
         1: ChromAlignModel(),
         2: ChromAlignModel(ignore_peak_profile = True),
@@ -217,4 +237,5 @@ def getModelVariant(variant):
         31: SimplifiedPeakEncoderVariant(number_of_right_convolution_stacks = 2)    # 3 + 19
     }
     assert variant in switcher, "Model variant does not exist. Check the integer input"
-    return switcher[variant]
+    model = switcher[variant]
+    return model

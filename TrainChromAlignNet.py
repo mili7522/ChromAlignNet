@@ -87,6 +87,7 @@ if train_with_gpu:
     session = tf.Session(config=config)
 
 
+
 ### Execute load for all folders
 data_time_1 = []
 data_time_2 = []
@@ -170,7 +171,8 @@ if not ignore_peak_profile:  # Insert peak data
                           data_peak_2.reshape((samples, max_peak_seq_length, 1))]
 
 
-###
+
+### Create and compile model
     
 # Check if existing checkpoints are present - if so then load and resume training from last epoch
 checkpoint_path = os.path.join(model_path, model_name + '-Checkpoint')

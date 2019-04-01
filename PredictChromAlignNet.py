@@ -23,6 +23,7 @@ results_path = prediction_options.get('results_path')
 calculate_f1_metric = prediction_options.get('calculate_f1_metric')
 calculate_metrics_for_components = prediction_options.get('calculate_metrics_for_components')
 plot_alignment = prediction_options.get('plot_alignment')
+ignore_same_sample = prediction_options.get('ignore_same_sample')
 ###
 
 ### These parameter are loaded individually in any batch prediction scripts, since they may change per model / data source
@@ -40,9 +41,22 @@ if os.path.isdir(results_path) == False:
     os.makedirs(results_path)
 
 
-### Load peak and mass slice profiles
+
 def prepareDataForPrediction(data_path, ignore_peak_profile):
     '''
+    Loads data and places into numpy arrays, reading for input into the network
+    Similar to the data preparation procedure in the training script
+    
+    Arguments:
+        data_path -- Location of the data set, as a string
+        ignore_peak_profile -- If True, the peak profile will not be used in the prediction (this is set to match how the model was trained)
+    
+    Returns:
+        prediction_data -- List of numpy arrays. Passed directly into the network as input data
+        comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
+        info_df -- DataFrame containing information about each peak
+        peak_df_orig -- DataFrame containing the unnormalised intensities along the profile of each peak
+        peak_intensity -- DataFrame containing the maximum intensity of each peak
     '''
     load_time = time.time()
 
@@ -107,10 +121,20 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
 
 def runPrediction(prediction_data, model_path, model_file, verbose = 1, predictions_save_name = None, comparisons = None):
     '''
-    Output:
-        predictions - list of numpy arrays. Each item in the list matches on of the output of the model (ie main, mass, peak, chromatogram)
-                      Take the first item in the list if only the main prediction is desired
-                      Probability
+    Runs the prediction
+    
+    Arguments:
+        prediction_data -- List of numpy arrays. Input data into the network
+        model_path -- Folder containing the model, as a string
+        model_file -- Name of the model, as a string
+        verbose -- 
+        predictions_save_name -- None or a string giving the name to save the prediction outcomes (as a csv file)
+        comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
+    
+    Returns:
+        predictions -- list of numpy arrays. Each item in the list matches one of the output of the model (i.e. main, mass, peak, chromatogram)
+                       Take the first item in the list if only the main prediction is desired
+                       Gives the probability of the two peaks to being aligned, as predicted by the model
     '''
     K.clear_session()
     predict_time = time.time()
@@ -150,4 +174,14 @@ if __name__ == "__main__":
     
     if plot_alignment:
         plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = False)
+        
+    ##
+#    x1 = comparisons[:,0]
+#    x2 = comparisons[:,1]
+#    g1 = info_df.loc[x1]['Group'].values
+#    g2 = info_df.loc[x2]['Group'].values
+#    keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
+#    truth = (g1 == g2)
+#    scores = model.evaluate(prediction_data, [truth] * 3)
+#    list(zip(model.metrics_names, scores))
 

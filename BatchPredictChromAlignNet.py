@@ -46,7 +46,8 @@ if save_individual_predictions:
     os.makedirs(results_path, exist_ok = True)
 
 
-### Load and pre-process data
+
+###
 metrics_list = []
 prediction_times_list = []
 model_fullname_list = []
