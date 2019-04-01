@@ -58,8 +58,9 @@ prediction_options = {
     'sequence_file': 'WholeSequence.csv',
     'real_groups_available': True,
     'plot_alignment': True,
-    'calculate_f1_metric': False,
-    'calculate_metrics_for_components': False
+    'calculate_f1_metric': True,
+    'calculate_metrics_for_components': True,
+    'ignore_same_sample': False
 }
 
 prediction_options['predictions_save_name'] = '{}/{}_{}_Prediction.csv'.format(prediction_options['results_path'], prediction_options['model_file'], getDatasetName(prediction_options['data_path']))

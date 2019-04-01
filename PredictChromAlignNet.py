@@ -62,7 +62,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
     chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
 
     # Generate data combinations
-    comparisons = generateCombinationIndices(info_df[keep_index], time_cutoff = time_cutoff, return_y = False)
+    comparisons = generateCombinationIndices(info_df[keep_index], time_cutoff = time_cutoff, return_y = False, ignore_same_sample = ignore_same_sample)
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
 

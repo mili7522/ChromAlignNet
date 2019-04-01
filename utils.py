@@ -120,10 +120,10 @@ def getChromatographSegmentDf(info_df, chromatogram_df, segment_length):
     return pd.DataFrame(chrom_seg_df)
 
 
-def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, random_seed = None):
     ''' Generates pairwise training examples
     Outputs:
         comparisons - Numpy array. May be returned as two columns - x1 and x2
+def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, random_seed = None, ignore_same_sample = False):
                       Contains the peak IDs of the two pairwise peaks. The peak ID is gives by the corresponding row index in info_df
         y - Only returned if return_y is true. A Numpy array equal to 1 where the two peaks belong to the same group, or 0 otherwise
 
@@ -147,6 +147,12 @@ def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, ran
         data_time_diff = abs(x1_time - x2_time)
         within_time_cutoff = data_time_diff < time_cutoff
         comparisons = comparisons[within_time_cutoff]
+
+    if ignore_same_sample:
+        x1_file = info_df.loc[comparisons[:,0]]['File'].values
+        x2_file = info_df.loc[comparisons[:,1]]['File'].values
+        different_file = x1_file != x2_file
+        comparisons = comparisons[different_file]
 
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]

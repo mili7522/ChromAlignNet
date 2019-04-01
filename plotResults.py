@@ -13,10 +13,17 @@ real_groups_available = prediction_options.get('real_groups_available')
 prediction_file = prediction_options.get('predictions_save_name')
 calculate_f1_metric = prediction_options.get('calculate_f1_metric')
 calculate_metrics_for_components = prediction_options.get('calculate_metrics_for_components')
+ignore_same_sample = prediction_options.get('ignore_same_sample')
 
-def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = True):
 
     distance_matrix = getDistanceMatrix(comparisons, info_df.index.max() + 1, prediction, clip = 50, info_df = info_df)
+def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = True, ignore_same_sample = False):
+    if ignore_same_sample:
+        x1_file = info_df.loc[comparisons[:,0]]['File'].values
+        x2_file = info_df.loc[comparisons[:,1]]['File'].values
+        different_file = x1_file != x2_file
+        comparisons = comparisons[different_file]
+        prediction = prediction[different_file]
     groups = assignGroups(distance_matrix, threshold = 2)
     groups = postprocessGroups(groups, info_df)
     alignTimes(groups, info_df, peak_intensity, 'AlignedTime')
