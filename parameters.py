@@ -1,20 +1,6 @@
 import os
 
-training_options = {
-    'epochs': 50,
-    'batch_size': 128,
-    'validation_split': 0.2,
-    'verbose_training': 2, # 0 = silent, 1 = progress bar, 2 = one line per epoch 
-    'adam_optimizer_options': {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999},
-    'train_with_gpu': True,
-    'random_seed_type': 1,  # Type 1 for repeatability within repetitions, type 2 for random number using clock time, type 3 for previously used number
-    
-    'save_checkpoints': True,  # If checkpoints exist, training will resume from the last checkpoint
-    'save_history': True,
-    'model_path': 'SavedModels',
-    'model_name': 'ChromAlignNet',
-
-
+data_options = {
     'datasets': [ 'data/training-Air103/',        #0
                   'data/training-Air115/',        #1
                   'data/training-Air143/',        #2
@@ -27,7 +13,25 @@ training_options = {
                   'data/test-Field73/',           #9
                   'data/test-Field88/',           #10
                   'data/test-Field134/'           #11
-                ],
+                ],        
+}
+data_options['dataset_name'] = [ x.split('-')[-1].strip('/') for x in data_options['datasets'] ]
+
+training_options = {
+    'epochs': 50,  # Number of iterations through the training set
+    'batch_size': 128,
+    'validation_split': 0.2,  # Ratio of the data set to be used for validation
+    'verbose_training': 2,  # 0 = silent, 1 = progress bar, 2 = one line per epoch 
+    'adam_optimizer_options': {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999},  # Optimiser options. lr = learning rate
+    'train_with_gpu': True,
+    'random_seed_type': 1,  # Type 1 for repeatability within repetitions, type 2 for random number using clock time, type 3 for previously used number
+    
+    'save_checkpoints': True,  # If True, the model will be (uniquely) saved after every epoch. If checkpoints exist, training will resume from the last checkpoint
+    'save_history': True,  # If True, the loss and accuracy of the model over epoches will be saved as a csv file
+    'model_path': 'SavedModels',  # Folder to save the model. Checkpoints will be saved in a subfolder 'Checkpoints'
+    'model_name': 'ChromAlignNet',  # Name prefix given to the saved model
+                 
+    'datasets' : data_options['datasets'],
     'dataset_for_model': {
                          'A': [0, 1],
                          'B': [0, 1, 2],
@@ -39,38 +43,40 @@ training_options = {
                          'H': [0, 1, 2, 3, 4, 5, 6]
                          },
 
-    'ignore_negatives': False,  # Ignore groups assigned with a negative index?
-    'info_file': 'PeakData-WithGroup.csv',
-    'sequence_file': 'WholeSequence.csv'
+    'ignore_negatives': False,  # If True, groups assigned with a negative index will be ignored in training
+    'info_file': 'PeakData-WithGroup.csv',  # Name of csv file containing summary information about each peak. Loaded into infoDf
+    'sequence_file': 'WholeSequence.csv'  # Name of csv file containing the 
 }
 
-def getDatasetName(path):
-    return path.split('-')[-1].strip('/')
 
 prediction_options = {
-    'ignore_negatives': False,  # Ignore groups assigned with a negative index?
-    'time_cutoff': 3, # Three minutes
-    'results_path': 'results',
+    'ignore_negatives': False,  # If True, groups assigned with a negative index will be ignored in prediction
+    'time_cutoff': 3,  # Three minutes
+    'results_path': 'results/results_old',  # Path to save results
 
     'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-H-03-r06',
-    'data_path': training_options['datasets'][7],
+    'model_file': 'ChromAlignNet-H-02-r02',
+    'dataset_number': 7,  # Data set to align (indexed according to data_options['datasets'])
     'info_file': 'PeakData-WithGroup.csv',
     'sequence_file': 'WholeSequence.csv',
-    'real_groups_available': True,
     'plot_alignment': True,
     'calculate_f1_metric': True,
     'calculate_metrics_for_components': True,
     'ignore_same_sample': False
 }
-prediction_options['predictions_save_name'] = os.path.join(prediction_options['results_path'], prediction_options['model_file'] + "_" + getDatasetName(prediction_options['data_path']) + "_Prediction.csv")
+prediction_options['dataset_name'] = data_options['dataset_name'][prediction_options['dataset_number']]
+prediction_options['data_path'] = data_options['datasets'][prediction_options['dataset_number']]
+prediction_options['predictions_save_name'] = os.path.join(prediction_options['results_path'],
+                  prediction_options['model_file'] + "_" + data_options['dataset_name'][prediction_options['dataset_number']] + "_Prediction.csv")
 
 batch_prediction_options = {
-    'save_names': ["ModelTests-On{}.csv".format(getDatasetName(x)) for x in training_options['datasets']],
+    'dataset_name': data_options['dataset_name'],
+    'data_paths' : data_options['datasets'],
+    'save_names': ["ModelTests-On{}.csv".format(x) for x in data_options['dataset_name']],
     'model_repeats': range(1,11),
     'model_names': ['H'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
     'model_variants': [2], #[20, 21, 26], # range(1, 28),
     'verbose_prediction' : 0,
     'save_individual_predictions': True,
-    'individual_predictions_save_path': 'Individual'
+    'individual_predictions_save_path': 'Individual'  # Name of subfolder to store individual prediction output, or 'None' to store in the main results_path
 }

@@ -16,7 +16,7 @@ def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'W
         data_path -- String: Path of data folder
         info_file -- String: Name of the file which will be loaded into info_df
         sequence_file -- String: Name of the file which contains the whole chromatogram sequences for all files
-        take_chromatogram_log - Boolean: whether the chromatogram_df is transformed by taking the log (base 2)
+        take_chromatogram_log -- Boolean: whether the chromatogram_df is transformed by taking the log (base 2)
     
     Returns:
         info_df -- Dataframe of peak information. Number of rows = number of peaks
@@ -594,7 +594,7 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
             predictions = [predictions[0]]
             
     for prediction in predictions:
-        p = np.round(prediction).astype(int).reshape((-1))
+        p = np.round(prediction).astype(int).ravel()
         p_ignore_neg = p[keep]
     
         TP = np.mean(p_ignore_neg[truth_ignore_neg])

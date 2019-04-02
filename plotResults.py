@@ -1,19 +1,42 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import os
 from utils import loadData, plotSpectrumTogether, plotPeaksTogether, getRealGroupAssignments
 from utils import getDistanceMatrix, assignGroups, alignTimes, calculateMetrics, postprocessGroups
-from parameters import prediction_options
+from parameters import prediction_options, batch_prediction_options
 
-data_path = prediction_options.get('data_path')
-info_file = prediction_options.get('info_file')
-sequence_file = prediction_options.get('sequence_file')
-real_groups_available = prediction_options.get('real_groups_available')
-prediction_file = prediction_options.get('predictions_save_name')
-calculate_f1_metric = prediction_options.get('calculate_f1_metric')
-ignore_same_sample = prediction_options.get('ignore_same_sample')
 
-def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = True, ignore_same_sample = False):
+def loadPredictions(prediction_file):
+    """
+    Loads saved prediction output from the model with corresponding comparison file
+    Takes into account batch prediction that might have saved individual prediction output into a subfolder
+    
+    Arguments:
+        prediction_file -- 
+        
+    Outputs:
+        prediction --
+        comparisons --
+    """
+    try:
+        prediction = pd.read_csv(prediction_file, usecols = [2]).values
+        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+    except FileNotFoundError as e:
+        try:
+            if batch_prediction_options['save_individual_predictions']:
+                results_path = prediction_options['results_path']
+                individual_predictions_save_path = batch_prediction_options['individual_predictions_save_path']
+                if individual_predictions_save_path is not None:
+                    prediction_file = prediction_file.replace(results_path.rstrip('/\\'), os.path.join(results_path, individual_predictions_save_path))
+            prediction = pd.read_csv(prediction_file, usecols = [2]).values
+            comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
+        except:
+            raise e
+
+    return prediction, comparisons
+
+def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = True):
     """
     Performs alignment and plots the outcome
     Given the output from ChromAlignNet, which corresponds to pairwise probabilities of alignment between peaks,
@@ -27,9 +50,9 @@ def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensit
         peak_df_orig -- DataFrame containing the unnormalised intensities along the profile of each peak
         peak_intensity -- DataFrame containing the maximum intensity of each peak
         print_metrics -- If True, prints metrics related to the prediction outcome (TP, FP, F1, etc)
-        ignore_same_sample -- If True, removes comparisons between peaks originating from the same sample
     """
-    if ignore_same_sample:
+    
+    if prediction_options['ignore_same_sample']:
         x1_file = info_df.loc[comparisons[:,0]]['File'].values
         x2_file = info_df.loc[comparisons[:,1]]['File'].values
         different_sample = x1_file != x2_file
@@ -44,11 +67,12 @@ def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensit
     groups = postprocessGroups(groups, info_df)
     
     alignTimes(groups, info_df, peak_intensity, 'AlignedTime')
+    real_groups_available = 'Group' in info_df
     if real_groups_available:
         real_groups = getRealGroupAssignments(info_df)
         alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
         if print_metrics:
-            calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False, calculate_f1 = calculate_f1_metric, print_metrics = True)
+            calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False, calculate_f1 = prediction_options['calculate_f1_metric'], print_metrics = True)
 
     plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
 #    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot')
@@ -136,16 +160,17 @@ def plotPeaksByIndex(index = None, margin = 100, plot_log_sequence = True, read_
 
 
 
-def plotPerformanceByModel(filename = None, use_false_pos_ignore_neg = True):
+def plotPerformanceByModel(dataset_name = None, use_false_pos_ignore_neg = True):
     """
     Plots a bar chart comparing the true positives and false positives of a variety of models
     Uses the output from the batch prediction script
     
     Arguments:
-        filename -- Name of a csv file created by the batch prediction script, defined as a string
+#        filename -- Name of a csv file created by the batch prediction script, defined as a string
+        dataset_name -- 
         use_false_pos_ignore_neg -- If True, the 'False Positives - Ignore Neg Idx' column is used in place of the 'False Positives' column
     """
-    # TODO: Better loading of filenames
+    filename = os.path.join(prediction_options['results_path'], 'ModelTests-On{}.csv'.format(dataset_name))
     df = pd.read_csv(filename, index_col = 0)
 
     # Select appropriate false positives column
@@ -176,11 +201,14 @@ def plotPerformanceByModel(filename = None, use_false_pos_ignore_neg = True):
     plt.show()
 
 
-def plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_negative_group = True):
+def plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True):
     """
     Plots a heatmap representation of the 2D probability matrix arranged by peak time (and ground truth group if 'sort_by_group' = True)
     
     Arguments:
+        prediction -- Numpy array giving a column vector of probabilities (from the main output of ChromAlignNet)
+        comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
+        info_df -- DataFrame containing information about each peak
         threshold -- None or a Float between 0 and 1.
                      If it is a float, the plot shows the outcome of a binary classifier, with the decision threshold set at this values
         sort_by_group -- If True, the peaks will be sorted by ascending ground truth groups as well as peak retention time.
@@ -225,7 +253,8 @@ def plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_nega
     min_time = info_df['peakMaxTime'].min()
     plt.imshow(prediction_matrix, extent = None if sort_by_group else (min_time, max_time, max_time, min_time))
     
-    dataset_name = prediction_file.split('_')[-2]
+    
+    dataset_name = prediction_options['dataset_name']
     if threshold is not None:
         plt.title('{}\nProbability Threshold: {}'.format(dataset_name, threshold))
     else:
@@ -312,7 +341,7 @@ def plotHistory(kind = 'loss', all_reps = False):
         kind = [kind]
     if all_reps:
         histories = []
-        for rep in range(1,11):
+        for rep in batch_prediction_options['model_repeats']:
             f = '{}/{}-r{:02}-History.csv'.format(prediction_options['model_path'], prediction_options['model_file'][:-4], rep)
             df = pd.read_csv(f, index_col = 0)
             histories.append(df)
@@ -350,24 +379,23 @@ def plotSubnetworkHistory(kind = 'acc', all_reps = False):
     plt.ylabel('Accuracy' if kind.endswith('acc') else 'Loss')
 
 
+
+
+
 if __name__ == "__main__":
+    data_path = prediction_options['data_path']
+    info_file = prediction_options['info_file']
+    sequence_file = prediction_options['sequence_file']
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
+    prediction, comparisons = loadPredictions(prediction_options['predictions_save_name'])
     
-#    try:
-#        prediction = pd.read_csv(prediction_file, usecols = [2]).values
-#        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
-#    except FileNotFoundError:
-#        results_path = prediction_options.get('results_path')
-#        individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path')
-#        prediction_file = os.path.join(results_path, individual_predictions_save_path, prediction_file.lstrip('results/') )  # TODO: Improve?
-#        prediction = pd.read_csv(prediction_file, usecols = [2]).values
-#        comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
-    
-    
+    ###
 #    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
 #    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
-#    plotPerformanceByModel('results/ModelTests-OnField73.csv')
-#    plotProbabilityMatrix(threshold = None, sort_by_group = True, highlight_negative_group = True)
+    
+
+#    plotPerformanceByModel(prediction_options['dataset_name'])
+#    plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True)
 #    plotHistory('loss', True)
     plotSubnetworkHistory('val_acc', False)
 

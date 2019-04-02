@@ -15,7 +15,6 @@ from parameters import prediction_options
 ### These parameters are loaded here even for any batch prediction scripts
 ignore_negatives = prediction_options.get('ignore_negatives')
 time_cutoff = prediction_options.get('time_cutoff')
-real_groups_available = prediction_options.get('real_groups_available')
 info_file = prediction_options.get('info_file')
 sequence_file = prediction_options.get('sequence_file')
 results_path = prediction_options.get('results_path')
@@ -43,7 +42,7 @@ if os.path.isdir(results_path) == False:
 
 
 def prepareDataForPrediction(data_path, ignore_peak_profile):
-    '''
+    """
     Loads data and places into numpy arrays, reading for input into the network
     Similar to the data preparation procedure in the training script
     
@@ -57,10 +56,11 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
         info_df -- DataFrame containing information about each peak
         peak_df_orig -- DataFrame containing the unnormalised intensities along the profile of each peak
         peak_intensity -- DataFrame containing the maximum intensity of each peak
-    '''
+    """
     load_time = time.time()
 
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file)
+    real_groups_available = 'Group' in info_df  # Check if ground truth groups have been assigned
 
     # Remove null rows and negative indexed groups
     keep_index = (pd.notnull(mass_profile_df).all(1))
@@ -120,7 +120,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
 
 
 def runPrediction(prediction_data, model_path, model_file, verbose = 1, predictions_save_name = None, comparisons = None):
-    '''
+    """
     Runs the prediction
     
     Arguments:
@@ -135,7 +135,7 @@ def runPrediction(prediction_data, model_path, model_file, verbose = 1, predicti
         predictions -- list of numpy arrays. Each item in the list matches one of the output of the model (i.e. main, mass, peak, chromatogram)
                        Take the first item in the list if only the main prediction is desired
                        Gives the probability of the two peaks to being aligned, as predicted by the model
-    '''
+    """
     K.clear_session()
     predict_time = time.time()
     ### Load model
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     predictions = runPrediction(prediction_data, model_path, model_file, predictions_save_name = predictions_save_name, comparisons = comparisons)
     prediction = predictions[0]
 
-    if real_groups_available:
+    if 'Group' in info_df:
         calculateMetrics(predictions, info_df, comparisons, calculate_for_components = calculate_metrics_for_components, calculate_f1 = calculate_f1_metric, print_metrics = True)
     
     if plot_alignment:

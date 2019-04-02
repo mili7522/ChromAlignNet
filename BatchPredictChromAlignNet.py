@@ -4,14 +4,14 @@ import os
 import time
 import sys
 from PredictChromAlignNet import prepareDataForPrediction, runPrediction
-from parameters import prediction_options, training_options, batch_prediction_options, getDatasetName
+from parameters import prediction_options, batch_prediction_options
 from model_definition import getModelVariant
 from utils import calculateMetrics
 
 
 ### Options
 model_path = prediction_options.get('model_path')
-data_paths = training_options.get('datasets')
+data_paths = batch_prediction_options.get('data_paths')
 model_prefix = 'ChromAlignNet-'
 results_path = prediction_options.get('results_path')
 
@@ -41,7 +41,7 @@ else:
 data_path = data_paths[dataset_number]
 
 if save_individual_predictions:
-    individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path')
+    individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path') or ""  # Will give "" if individual_predictions_save_path is None
     results_path = os.path.join(results_path, individual_predictions_save_path)
     os.makedirs(results_path, exist_ok = True)
 
@@ -97,7 +97,7 @@ for i in model_variants:
             model_fullname_list.append(name + '-' + '{:02d}'.format(i))  
             
             if save_individual_predictions:
-                predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path, model_file, getDatasetName(data_path))
+                predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path, model_file, batch_prediction_options['dataset_name'])
             else:
                 predictions_save_name = None
             
