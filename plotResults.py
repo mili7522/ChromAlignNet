@@ -4,6 +4,7 @@ import numpy as np
 import os
 from utils import loadData, plotSpectrumTogether, plotPeaksTogether, getRealGroupAssignments
 from utils import getDistanceMatrix, assignGroups, alignTimes, calculateMetrics, postprocessGroups
+from utils import getIncorrect
 from parameters import prediction_options, batch_prediction_options
 
 
@@ -392,10 +393,13 @@ if __name__ == "__main__":
     ###
 #    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
 #    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
+#    incorrect = getIncorrect(prediction, info_df, comparisons, ignore_neg = True, number = 5).ravel()
+#    incorrect = np.unique(incorrect)
+#    plotPeaksByIndex(incorrect, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
     
 
 #    plotPerformanceByModel(prediction_options['dataset_name'])
 #    plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True)
 #    plotHistory('loss', True)
-    plotSubnetworkHistory('val_acc', False)
+#    plotSubnetworkHistory('val_acc', False)
 

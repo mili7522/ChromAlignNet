@@ -620,3 +620,18 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
                 print('F1: {:.3f}'.format(f1))
 
     return metrics
+
+def getIncorrect(prediction, info_df, comparisons, ignore_neg = True, number = None):
+    x1 = comparisons[:,0]
+    x2 = comparisons[:,1]
+    g1 = info_df.loc[x1]['Group'].values
+    g2 = info_df.loc[x2]['Group'].values
+    truth = (g1 == g2)
+    p = np.round(prediction).astype(int).ravel()
+    if ignore_neg:
+        keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
+        truth = (g1[keep] == g2[keep])
+        p = p[keep]
+        comparisons = comparisons[keep]
+    incorrect = p != truth
+    return comparisons[incorrect][:number]
