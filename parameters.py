@@ -1,7 +1,7 @@
 import os
 
 data_options = {
-    'datasets': [ 'data/training-Air103/',        #0
+    'datasets': [ 'data/training-Air103/',        #0   Folder location of available data sets (training and test)
                   'data/training-Air115/',        #1
                   'data/training-Air143/',        #2
                   'data/training-Breath103/',     #3
@@ -32,7 +32,7 @@ training_options = {
     'model_name': 'ChromAlignNet',  # Name prefix given to the saved model
                  
     'datasets' : data_options['datasets'],
-    'dataset_for_model': {
+    'dataset_for_model': {  # List of which data sets (indexed from 'datasets') will be used to train each model ('A', 'B', etc)
                          'A': [0, 1],
                          'B': [0, 1, 2],
                          'C': [0, 1, 3],
@@ -44,39 +44,47 @@ training_options = {
                          },
 
     'ignore_negatives': False,  # If True, groups assigned with a negative index will be ignored in training
-    'info_file': 'PeakData-WithGroup.csv',  # Name of csv file containing summary information about each peak. Loaded into infoDf
-    'sequence_file': 'WholeSequence.csv'  # Name of csv file containing the 
+    'info_file': 'PeakData-WithGroup.csv',  # Name of csv file containing summary information about each peak. Loaded as infoDf
+    'sequence_file': 'WholeSequence.csv'  # Name of csv file containing the data used to extract the chromatogram segments
 }
 
 
 prediction_options = {
     'ignore_negatives': False,  # If True, groups assigned with a negative index will be ignored in prediction
-    'time_cutoff': 3,  # Three minutes
-    'results_path': 'results/results_old',  # Path to save results
+    'time_cutoff': 3,  # Maximum difference in retention time (in minutes) between two peaks which will be considered for alignment
+    'results_path': 'results',  # Path to save results
 
-    'model_path': 'SavedModels/',
-    'model_file': 'ChromAlignNet-H-02-r02',
+    'model_path': 'SavedModels/',  # Path where trained models are saved
+    'model_file': 'ChromAlignNet-H-02-r02',  # Name of specific model to load and use for prediction
     'dataset_number': 7,  # Data set to align (indexed according to data_options['datasets'])
-    'info_file': 'PeakData-WithGroup.csv',
-    'sequence_file': 'WholeSequence.csv',
-    'plot_alignment': True,
+    'info_file': 'PeakData-WithGroup.csv',  # Name of csv file containing summary information about each peak. Loaded as infoDf
+    'sequence_file': 'WholeSequence.csv',  # Name of csv file containing the data used to extract the chromatogram segments
+    'plot_alignment': True,  # If True, the alignment outcome will be plotted after prediction in PredictChromAlignNet.py
     'calculate_f1_metric': True,
-    'calculate_metrics_for_components': True,
-    'ignore_same_sample': False
+    'calculate_metrics_for_components': True,  # If True, the metrics for the output from each sub-network will be calculated as well as the main output
+    'ignore_same_sample': False  # If True, peaks from within the same sample will not be considered for alignment (and so assumed to have a probability of 0)
 }
 prediction_options['dataset_name'] = data_options['dataset_name'][prediction_options['dataset_number']]
 prediction_options['data_path'] = data_options['datasets'][prediction_options['dataset_number']]
+# Path and filename of where prediction output will be saved:
 prediction_options['predictions_save_name'] = os.path.join(prediction_options['results_path'],
                   prediction_options['model_file'] + "_" + data_options['dataset_name'][prediction_options['dataset_number']] + "_Prediction.csv")
 
 batch_prediction_options = {
     'dataset_name': data_options['dataset_name'],
     'data_paths' : data_options['datasets'],
+    'model_prefix': training_options['model_name'],
     'save_names': ["ModelTests-On{}.csv".format(x) for x in data_options['dataset_name']],
     'model_repeats': range(1,11),
     'model_names': ['H'], # ['A', 'B', 'C', 'D', 'E', 'F', 'G'],  
     'model_variants': [2], #[20, 21, 26], # range(1, 28),
-    'verbose_prediction' : 0,
+    'verbose_prediction' : 0,  # 0 or 1
     'save_individual_predictions': True,
     'individual_predictions_save_path': 'Individual'  # Name of subfolder to store individual prediction output, or 'None' to store in the main results_path
+}
+
+
+extraction_options = {
+    'data_path' : 'F:/GCMS/results/airSamples/sigThreshold_10/0fullResults',
+    'save_path': '../Data/Temp/'
 }

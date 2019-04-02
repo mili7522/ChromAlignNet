@@ -1,15 +1,13 @@
-from scipy.io import loadmat
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
-import fnmatch
+from scipy.io import loadmat
+from parameters import extraction_options
 
-data_path = 'F:/GCMS/results/airSamples/sigThreshold_10/0fullResults'
-#data_path = 'F:/GCMS/results/healthyControl/sigThreshold_10/0fullResults'
-#data_path = 'D:/Files/Documents/SkyDrive/GCMS/results/instrumentStability/Cycle1/sigThreshold_2/0fullResults'
-outPath = '../Data/Temp/'
 
+### Load options
+data_path = extraction_options['data_path']
 #masses = [39, 41, 42, 43, 55, 56, 57, 58, 71, 72, 74, 85, 100]
 masses = [115]
 filesToProcess = 10
@@ -20,10 +18,17 @@ timeWindow = (0, np.inf)
 margin = 300
 sortByPeakArea = False
 
+save_path = extraction_options['save_path']
+os.makedirs(save_path, exist_ok = True)  # Make the save_path if it doesn't exist
+
+
+
+
+
 # Get files
 files = []
 for f in os.listdir(data_path):
-    if fnmatch.fnmatch(f, '*.mat'):
+    if f.endswith('.mat'):
         files.append(f)
 #files.sort()
 from random import shuffle
@@ -100,8 +105,8 @@ for i in range(min(filesToProcess, len(files))):
                 extractedPeak = dataRaw[massInd + 1, startInd:endInd+1]
                 massSlice = dataRaw[1:, peakMaxInd]
                 plt.plot(extractedPeak)
-                np.savetxt(outPath + '{:04d}-Mass={}-File={}-Peak={}.txt'.format(fileNo,mass, i, j), extractedPeak, delimiter = ',')
-                np.savetxt(outPath + '{:04d}-Mass={}-File={}-Peak={}-MassSlice.tsv'.format(fileNo,mass, i, j), massSlice, delimiter = '\t')
+                np.savetxt(save_path + '{:04d}-Mass={}-File={}-Peak={}.txt'.format(fileNo,mass, i, j), extractedPeak, delimiter = ',')
+                np.savetxt(save_path + '{:04d}-Mass={}-File={}-Peak={}-MassSlice.tsv'.format(fileNo,mass, i, j), massSlice, delimiter = '\t')
                 fileNo += 1
             
 
@@ -111,8 +116,8 @@ for i in range(min(filesToProcess, len(files))):
 df = pd.concat(extractedPeakData)
 df.reset_index(inplace = True)
 df.columns = ['PeakNumber', 'startTime', 'endTime', 'peakMaxTime', 'File', 'Mass']
-df.to_csv(outPath + 'PeakData.csv')
-plt.savefig(outPath + 'FullPeakSequence-{}.png'.format(timeWindow), dpi = 300, format = 'png')
+df.to_csv(save_path + 'PeakData.csv')
+plt.savefig(save_path + 'FullPeakSequence-{}.png'.format(timeWindow), dpi = 300, format = 'png')
 
 sortIndex = sorted(range(len(wholeSequenceData)), key = lambda x: len(wholeSequenceData[x]), reverse = True)
 
@@ -128,4 +133,4 @@ for i, idx in enumerate(sortIndex):
 #dfWholeSequence.fillna(0, inplace = True)
 dfWholeSequence.columns = sortIndex
 dfWholeSequence.sort_index(axis = 1, inplace = True)  # Rearrange the axis in order of the files
-dfWholeSequence.to_csv(outPath + 'WholeSequence.csv')
+dfWholeSequence.to_csv(save_path + 'WholeSequence.csv')

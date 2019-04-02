@@ -11,25 +11,25 @@ from utils import loadData, getChromatographSegmentDf, generateCombinationIndice
 from model_definition import getModelVariant
 from parameters import training_options
 
-# Load parameters
-epochs = training_options.get('epochs')
-batch_size = training_options.get('batch_size')
-validation_split = training_options.get('validation_split')
-verbose_training = training_options.get('verbose_training')  
-adam_optimizer_options = training_options.get('adam_optimizer_options')
-train_with_gpu = training_options.get('train_with_gpu')
-random_seed_type = training_options.get('random_seed_type')
+### Load parameters
+epochs = training_options['epochs']
+batch_size = training_options['batch_size']
+validation_split = training_options['validation_split']
+verbose_training = training_options['verbose_training'] 
+adam_optimizer_options = training_options['adam_optimizer_options']
+train_with_gpu = training_options['train_with_gpu']
+random_seed_type = training_options['random_seed_type']
 
-save_checkpoints = training_options.get('save_checkpoints')  # If checkpoints exist, training will resume from the last checkpoint
-save_history = training_options.get('save_history')
-model_path = training_options.get('model_path')
-model_name = training_options.get('model_name')
+save_checkpoints = training_options['save_checkpoints']  # If checkpoints exist, training will resume from the last checkpoint
+save_history = training_options['save_history']
+model_path = training_options['model_path']
+model_name = training_options['model_name']
 
-datasets = training_options.get('datasets')
-dataset_for_model = training_options.get('dataset_for_model')
-info_file = training_options.get('info_file')
-sequence_file = training_options.get('sequence_file')
-ignore_negatives = training_options.get('ignore_negatives')
+datasets = training_options['datasets']
+dataset_for_model = training_options['dataset_for_model']
+info_file = training_options['info_file']
+sequence_file = training_options['sequence_file']
+ignore_negatives = training_options['ignore_negatives']
 
 
 # Modify the model name for different data sources, model variants and repetitions

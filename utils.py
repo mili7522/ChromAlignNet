@@ -621,7 +621,22 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
 
     return metrics
 
-def getIncorrect(prediction, info_df, comparisons, ignore_neg = True, number = None):
+def getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, sample_size = None):
+    """
+    Gets a sample of the incorrect predictions, returning the peak IDs of the incorrect pairs
+    
+    Arguments:
+        predictions -- Numpy array or list of numpy arrays: Column vector(s) of probabilities (from output(s) of ChromAlignNet)
+        info_df -- DataFrame containing information about each peak, in particular the assigned group number
+        comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
+        ignore_neg --If True, peaks corresponding with a negative group will be ignored
+        sample_size -- The number of incorrect examples to return, or None (which returns all incorrect examples)
+    
+    Returns:
+        incorrect_array -- Numpy array of size (sample_size, 2), where the first column refers to
+                           the peak ID of x1 and the second column refers to x2.
+                           Each row gives the pair of peaks involved in an incorrect prediction
+    """
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
     g1 = info_df.loc[x1]['Group'].values
@@ -634,4 +649,5 @@ def getIncorrect(prediction, info_df, comparisons, ignore_neg = True, number = N
         p = p[keep]
         comparisons = comparisons[keep]
     incorrect = p != truth
-    return comparisons[incorrect][:number]
+    incorrect_array = comparisons[incorrect][:sample_size]
+    return incorrect_array

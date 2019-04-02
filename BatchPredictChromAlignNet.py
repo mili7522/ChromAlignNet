@@ -9,26 +9,21 @@ from model_definition import getModelVariant
 from utils import calculateMetrics
 
 
-### Options
-model_path = prediction_options.get('model_path')
-data_paths = batch_prediction_options.get('data_paths')
-model_prefix = 'ChromAlignNet-'
-results_path = prediction_options.get('results_path')
-
-calculate_f1_metric = prediction_options.get('calculate_f1_metric')
-calculate_metrics_for_components = prediction_options.get('calculate_metrics_for_components')
-
-model_repeats = batch_prediction_options.get('model_repeats')
-model_variants = batch_prediction_options.get('model_variants')
-model_names =  batch_prediction_options.get('model_names')  
-
-verbose_prediction = batch_prediction_options.get('verbose_prediction') 
-save_individual_predictions = batch_prediction_options.get('save_individual_predictions')
+### Load parameters
+data_paths = batch_prediction_options['data_paths']
+model_repeats = batch_prediction_options['model_repeats']
+model_variants = batch_prediction_options['model_variants']
+model_names =  batch_prediction_options['model_names']
 
 dataset_number = int(sys.argv[1])
+data_path = data_paths[dataset_number]
+
+calculate_f1_metric = prediction_options['calculate_f1_metric']
+calculate_metrics_for_components = prediction_options['calculate_metrics_for_components']
+results_path = prediction_options['results_path']
 
 # Second system input of repetition number, thus need to modify the save_name variable
-save_names = batch_prediction_options.get('save_names')
+save_names = batch_prediction_options['save_names']
 if len(sys.argv) > 2:
     repeat = int(sys.argv[2])
     save_name = os.path.join(results_path, 
@@ -38,20 +33,18 @@ if len(sys.argv) > 2:
 else:
     save_name = os.path.join(results_path, save_names[dataset_number])
 
-data_path = data_paths[dataset_number]
 
-if save_individual_predictions:
-    individual_predictions_save_path = batch_prediction_options.get('individual_predictions_save_path') or ""  # Will give "" if individual_predictions_save_path is None
-    results_path = os.path.join(results_path, individual_predictions_save_path)
-    os.makedirs(results_path, exist_ok = True)
-
+if batch_prediction_options['save_individual_predictions']:
+    individual_predictions_save_path = batch_prediction_options['individual_predictions_save_path']
+    if individual_predictions_save_path is not None:
+        results_path_individual = os.path.join(results_path, individual_predictions_save_path)
+    os.makedirs(results_path_individual, exist_ok = True)
 
 
 ###
 metrics_list = []
 prediction_times_list = []
 model_fullname_list = []
-
 
 # XRW
 # Check input, make sure we're using the correct data file name and where 
@@ -91,18 +84,18 @@ for i in model_variants:
     for name in model_names:
         for repeat in model_repeats:
     
-            model_file = model_prefix + name + '-' + '{:02d}'.format(i) + '-r' + '{:02d}'.format(repeat)     # for full model name now    # XRW 08-10
+            model_file = "{}-{}-{:02d}-r{:02d}".format(batch_prediction_options['model_prefix'], name, i, repeat)
             print('---\nModel used: ', model_file)  
     
             model_fullname_list.append(name + '-' + '{:02d}'.format(i))  
             
-            if save_individual_predictions:
-                predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path, model_file, batch_prediction_options['dataset_name'])
+            if batch_prediction_options['save_individual_predictions']:
+                predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path_individual, model_file, batch_prediction_options['dataset_name'])
             else:
                 predictions_save_name = None
             
             predict_time = time.time()
-            predictions = runPrediction(prediction_data, model_path, model_file, verbose = verbose_prediction,
+            predictions = runPrediction(prediction_data, model_file, verbose = batch_prediction_options['verbose_prediction'],
                                            predictions_save_name = predictions_save_name, comparisons = comparisons)
             
             prediction_times_list.append(round((time.time() - predict_time)/60, 2))  # Currently in minutes

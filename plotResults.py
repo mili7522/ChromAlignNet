@@ -4,7 +4,7 @@ import numpy as np
 import os
 from utils import loadData, plotSpectrumTogether, plotPeaksTogether, getRealGroupAssignments
 from utils import getDistanceMatrix, assignGroups, alignTimes, calculateMetrics, postprocessGroups
-from utils import getIncorrect
+from utils import getIncorrectExamples
 from parameters import prediction_options, batch_prediction_options
 
 
@@ -14,11 +14,11 @@ def loadPredictions(prediction_file):
     Takes into account batch prediction that might have saved individual prediction output into a subfolder
     
     Arguments:
-        prediction_file -- 
+        prediction_file -- Path and filename of the saved location file, defined as a string
         
     Outputs:
-        prediction --
-        comparisons --
+        prediction -- Numpy array giving a column vector of probabilities (from the main output of ChromAlignNet)
+        comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
     """
     try:
         prediction = pd.read_csv(prediction_file, usecols = [2]).values
@@ -73,7 +73,8 @@ def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensit
         real_groups = getRealGroupAssignments(info_df)
         alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
         if print_metrics:
-            calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False, calculate_f1 = prediction_options['calculate_f1_metric'], print_metrics = True)
+            calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False,
+                             calculate_f1 = prediction_options['calculate_f1_metric'], print_metrics = True)
 
     plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
 #    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot')
@@ -167,10 +168,11 @@ def plotPerformanceByModel(dataset_name = None, use_false_pos_ignore_neg = True)
     Uses the output from the batch prediction script
     
     Arguments:
-#        filename -- Name of a csv file created by the batch prediction script, defined as a string
-        dataset_name -- 
+        dataset_name -- Name of the data set the models are being compared on, as a string, or None
+                        If None, the name given in prediction_options is used as the default
         use_false_pos_ignore_neg -- If True, the 'False Positives - Ignore Neg Idx' column is used in place of the 'False Positives' column
     """
+    dataset_name = dataset_name or prediction_options['dataset_name']  # Use the name given in prediction_options as the default
     filename = os.path.join(prediction_options['results_path'], 'ModelTests-On{}.csv'.format(dataset_name))
     df = pd.read_csv(filename, index_col = 0)
 
@@ -227,7 +229,8 @@ def plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, so
         
         sorted_groups = info_df.groupby('New_Group').mean().sort_values('peakMaxTime').index  # Gives the ordering of the groups sorted by average peak RT
         sorted_groups_dict = dict(zip(sorted_groups, range(len(sorted_groups))))  # Mapping between the old group ID and new group ID based on the sort order
-        idx_arrangement = pd.concat([info_df['New_Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1).sort_values(by = ['New_Group', 'peakMaxTime']).index # Sort by Group, then peakMaxTime
+        tmp_df = pd.concat([info_df['New_Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1)
+        idx_arrangement = tmp_df.sort_values(by = ['New_Group', 'peakMaxTime']).index # Sort by Group, then peakMaxTime
     else:
         idx_arrangement = info_df.sort_values('peakMaxTime').index
     idx_arrangement_dict = dict(zip(idx_arrangement, range(len(idx_arrangement)) ))
@@ -384,22 +387,21 @@ def plotSubnetworkHistory(kind = 'acc', all_reps = False):
 
 
 if __name__ == "__main__":
-    data_path = prediction_options['data_path']
-    info_file = prediction_options['info_file']
-    sequence_file = prediction_options['sequence_file']
-    info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path, info_file, sequence_file, take_chromatogram_log = False)
+
+    info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(prediction_options['data_path'], prediction_options['info_file'],
+                                                                                                prediction_options['sequence_file'], take_chromatogram_log = False)
     prediction, comparisons = loadPredictions(prediction_options['predictions_save_name'])
     
     ###
-#    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
-#    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
-#    incorrect = getIncorrect(prediction, info_df, comparisons, ignore_neg = True, number = 5).ravel()
-#    incorrect = np.unique(incorrect)
-#    plotPeaksByIndex(incorrect, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
+    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
+    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
+    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, number = 5).ravel()
+    incorrect = np.unique(incorrect)
+    plotPeaksByIndex(incorrect, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
     
 
-#    plotPerformanceByModel(prediction_options['dataset_name'])
-#    plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True)
-#    plotHistory('loss', True)
-#    plotSubnetworkHistory('val_acc', False)
+    plotPerformanceByModel(prediction_options['dataset_name'])
+    plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True)
+    plotHistory('loss', True)
+    plotSubnetworkHistory('val_acc', False)
 
