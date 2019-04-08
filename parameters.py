@@ -1,4 +1,5 @@
 import os
+import numpy as np  # Import in case extraction options time window needs np.inf
 
 data_options = {
     'datasets': [ 'data/training-Air103/',        #0   Folder location of available data sets (training and test)
@@ -13,9 +14,10 @@ data_options = {
                   'data/test-Field73/',           #9
                   'data/test-Field88/',           #10
                   'data/test-Field134/'           #11
-                ],        
+                ]
 }
 data_options['dataset_name'] = [ x.split('-')[-1].strip('/') for x in data_options['datasets'] ]
+
 
 training_options = {
     'epochs': 50,  # Number of iterations through the training set
@@ -70,6 +72,7 @@ prediction_options['data_path'] = data_options['datasets'][prediction_options['d
 prediction_options['predictions_save_name'] = os.path.join(prediction_options['results_path'],
                   prediction_options['model_file'] + "_" + data_options['dataset_name'][prediction_options['dataset_number']] + "_Prediction.csv")
 
+
 batch_prediction_options = {
     'dataset_name': data_options['dataset_name'],
     'data_paths' : data_options['datasets'],
@@ -85,6 +88,14 @@ batch_prediction_options = {
 
 
 extraction_options = {
-    'data_path' : 'F:/GCMS/results/airSamples/sigThreshold_10/0fullResults',
-    'save_path': '../Data/Temp/'
+    'data_path' : 'X:/QIMR_QTOF/PfTrial/QTOF/1.rawData_AmbientAir/sigThreshold_10/0fullResults',
+    'save_path': 'C:/Users/li270/Documents/Temp/Air103',
+    'masses': [103],  # List of masses
+    'max_files_to_process': 100,
+    'max_peaks_per_file': 1000,
+    'time_window': (13.9, 15.1),  # Tuple of (start time, end time) in minutes. Can use (0, np.inf) to get the whole chromatogram
+    'chromatogram_margin': 300,  # Number of time steps on each side of the time window to extract
+    'sort_by_peak_area': False,
+    'shuffle_files': False,
+    'peak_id_width': 3  # Number of digits in the peak id (padded by 0s). Ensure that this in enough to cover the total number of peaks generated (eg 3 for up to 999 peaks) so that the ordering of peaks is sorted the same across different operating systems
 }
