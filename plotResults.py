@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
-from utils import loadData, plotSpectrumTogether, plotPeaksTogether, getRealGroupAssignments
-from utils import getDistanceMatrix, assignGroups, alignTimes, calculateMetrics, postprocessGroups
-from utils import getIncorrectExamples
+from utilsData import loadData, getRealGroupAssignments, getIncorrectExamples, calculateMetrics
+from utilsPlotting import plotSpectrumTogether, plotPeaksTogether
+from utilsAlignment import getDistanceMatrix, assignGroups, alignTimes, postprocessGroups
 from parameters import prediction_options, batch_prediction_options
 
 

@@ -174,7 +174,7 @@ for i, idx in enumerate(sort_index):
 # Using direction = "nearest" also fills any blank values at the start with the first available value and 
 # any blank values at the end with the last available value
 
-# Rearrange the columns back to the order of the files processed (to match up with the number saved in PeakData.csv)
+# Rearrange the columns back to the order of the files processed (to match up with the 'File' number saved in PeakData.csv)
 df_chromatogram.columns = sort_index
 df_chromatogram.sort_index(axis = 1, inplace = True)
 df_chromatogram.to_csv(os.path.join(save_path, 'WholeSequence.csv'))

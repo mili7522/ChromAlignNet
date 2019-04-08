@@ -5,9 +5,9 @@ import sys
 import os
 import keras.backend as K
 from keras.models import load_model
-from utils import loadData, getChromatographSegmentDf, generateCombinationIndices, calculateMetrics
+from utilsData import loadData, getChromatographSegmentDf, generateCombinationIndices, calculateMetrics
 from plotResults import plotAlignments
-from model_definition import getModelVariant
+from modelDefinition import getModelVariant
 from parameters import prediction_options
 
 
