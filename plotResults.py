@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
-from utilsData import loadData, getRealGroupAssignments, getIncorrectExamples, calculateMetrics
-from utilsPlotting import plotSpectrumTogether, plotPeaksTogether
+from utilsData import loadData, getRealGroupAssignments, getIncorrectExamples, calculateMetrics, printLastValues
+from utilsPlotting import plotSpectrumTogether, plotPeaksTogether, plotPeaksByIndex
 from utilsAlignment import getDistanceMatrix, assignGroups, alignTimes, postprocessGroups
 from parameters import prediction_options, batch_prediction_options
 
@@ -36,6 +36,7 @@ def loadPredictions(prediction_file):
             raise e
 
     return prediction, comparisons
+
 
 def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity, print_metrics = True):
     """
@@ -82,181 +83,171 @@ def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensit
     plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = None, save_data = False)
 
 
-
-def plotPeaksByIndex(index = None, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False):
+def plotMetricsByModel(dataset_name = None, use_false_pos_ignore_neg = True, metrics = ['True Positives', 'False Positives'],
+                       use_range = False, plot_aspect = 6):
     """
-    Plots several views of one or more peaks
-    Views of the peak profiles, mass spectra and chromatogram segments are shown
-    
-    Arguments:
-        index -- None or a list of IDs of the peaks to be plotted (peak IDs correspond to the index of the info_df DataFrame)
-                 If index is None then input is given from the console and are added successively to a list until a blank input is given
-        margin -- The number of time steps to either side of the average retention time to plot in the chromatogram segment figure
-        plot_log_sequence -- If True, produces an additional figure of the chromatogram segment on a semi-log plot
-        read_clipboard -- If True, the clipboard is read to get the list of peak ID values
-        plot_as_subplots -- If True, produces subplots in one figure instead of separate figures
-    """
-    if plot_as_subplots:
-        fig, axes = plt.subplots(2,2)
-    else:
-        axes = np.array([[None] * 2, [plt] * 2], dtype=np.object)
-    
-    if index is None:
-        if read_clipboard:
-            index = pd.read_clipboard(header = None).squeeze().tolist()
-        else:
-            index = []
-            while True:
-                i = input("Index:")
-                if i == '': break
-                else: index.append(int(i))
-    print(info_df.loc[index])
-    peak_df_orig.loc[index].transpose().plot(ax = axes[0,0])
-    if plot_as_subplots:
-        axes[0,0].ticklabel_format(scilimits = (0,3))
-        axes[0,0].set_title('Peak profile', fontdict = {'fontsize': 18})
-    else:
-        plt.title('Peak profile')
-        
-    mass_profile_df.loc[index].transpose().plot(ax = axes[0,1])
-    if plot_as_subplots:
-        axes[0,1].ticklabel_format(scilimits = (0,3))
-        axes[0,1].set_title('Mass spectrum at the time of peak maximum', fontdict = {'fontsize': 18})
-        axes[0,1].set_xlabel('m/z', fontdict = {'fontsize': 12})
-    else:
-        plt.title('Mass spectrum at the time of peak maximum')
-        plt.figure()
-    
-    chrom_idx = np.argmin(np.abs(chromatogram_df.columns - np.mean(info_df.loc[index]['peakMaxTime'])).values)
-    axes[1,0].plot(chromatogram_df.iloc[:, max(0,chrom_idx - margin) : chrom_idx + margin].transpose(), 'gray', alpha = 0.2, label = '_nolegend_')
-    for i, file in enumerate(info_df.loc[index]['File']):
-        p = axes[1,0].plot(chromatogram_df.iloc[file, max(0,chrom_idx - margin) : chrom_idx + margin].transpose(), linewidth=3, label = index[i])
-        # Plot line to the top of the peak at 'peakMaxTime'. Helps keep track of which peak to look at
-        axes[1,0].plot((info_df.loc[index[i]]['peakMaxTime'], info_df.loc[index[i]]['peakMaxTime']),
-                  (0, max(peak_df_orig.loc[index[i]])), color = p[-1].get_color(), label = '_nolegend_')
-    axes[1,0].legend()
-    axes[1,0].ticklabel_format(scilimits = (0,3))
-    if plot_as_subplots:
-        axes[1,0].set_title('Chromatogram segment', fontdict = {'fontsize': 18})
-        axes[1,0].set_xlabel('Retention Time (min)', fontdict = {'fontsize': 12})
-    else:
-        plt.title('Chromatogram segment')
-        plt.figure()
-    
-    if plot_log_sequence:
-        axes[1,1].plot(chromatogram_df.iloc[:, max(0,chrom_idx - margin) : chrom_idx + margin].transpose(), 'gray', alpha = 0.2, label = '_nolegend_')
-        for i, file in enumerate(info_df.loc[index]['File']):
-            segment = chromatogram_df.iloc[file, max(0,chrom_idx - margin) : chrom_idx + margin].transpose()
-            segment = segment[segment != 0]
-            p = axes[1,1].semilogy(segment, linewidth=3, label = index[i])
-            # Plot line to the top of the peak at 'peakMaxTime'. Helps keep track of which peak to look at
-            axes[1,1].semilogy((info_df.loc[index[i]]['peakMaxTime'], info_df.loc[index[i]]['peakMaxTime']),
-                      (np.min(segment), max(peak_df_orig.loc[index[i]])), color = p[-1].get_color(), label = '_nolegend_')
-        axes[1,1].legend()
-        if plot_as_subplots:
-            axes[1,1].set_title('Chromatogram segment - log scale', fontdict = {'fontsize': 18})
-            axes[1,1].set_xlabel('Retention Time (min)', fontdict = {'fontsize': 12})
-            plt.show()
-        else:
-            plt.title('Chromatogram segment - log scale')
-
-
-
-def plotPerformanceByModel(dataset_name = None, use_false_pos_ignore_neg = True):
-    """
-    Plots a bar chart comparing the true positives and false positives of a variety of models
+    Plots a bar chart comparing the performance (multiple metrics) of a variety of models on one data set
     Uses the output from the batch prediction script
     
     Arguments:
         dataset_name -- Name of the data set the models are being compared on, as a string, or None
                         If None, the name given in prediction_options is used as the default
         use_false_pos_ignore_neg -- If True, the 'False Positives - Ignore Neg Idx' column is used in place of the 'False Positives' column
+        metrics -- 
+        use_range -- If True, the range is plotted as asymmetric error bars instead of the standard deviation
+        plot_aspect -- None, or a number. Defines the aspect ratio of the plot. If None, the default is used.
     """
     dataset_name = dataset_name or prediction_options['dataset_name']  # Use the name given in prediction_options as the default
     filename = os.path.join(prediction_options['results_path'], 'ModelTests-On{}.csv'.format(dataset_name))
     df = pd.read_csv(filename, index_col = 0)
 
+    if isinstance(metrics, str):
+        metrics = [metrics]
+
     # Select appropriate false positives column
-    if use_false_pos_ignore_neg:
+    if use_false_pos_ignore_neg and 'False Positives' in metrics:
         del df['False Positives']
         df = df.rename(columns = {'False Positives - Ignore Neg Idx': 'False Positives'})
 
-    g = df[['True Positives', 'False Positives', 'Model Name']].groupby('Model Name')
+    if 'TP - FP' in metrics:  # Calculate the difference between the true positives and false positives
+        df['TP - FP'] = df['True Positives'] - df['False Positives']
+
+    plotColumns(df, metrics, use_range, reference_model = 0, plot_aspect = plot_aspect)
+
+
+def plotPerformanceOnDatasetsByModel(datasets = None, metric = 'True Positives', use_range = False,
+                                     plot_aspect = None, reference_model = None):
+    """
+    Plots a bar chart comparing one performance metric of a variety of models on multiple data sets
+    Uses the outputs from the batch prediction script
+    
+    Arguments:
+        datasets -- None, or a list of Ints corresponding to the data sets to plot
+        metric -- Name of the metric to plot, as a string
+    """
+    datasets = datasets or range(len(batch_prediction_options['dataset_name']))
+
+    f = batch_prediction_options['save_names']
+    names = batch_prediction_options['dataset_name']
+    
+    dfs = []
+    for i in datasets:
+        df = pd.read_csv(os.path.join(prediction_options['results_path'], f[i]), index_col = 0)
+        df = df[[metric] + ['Model Name']].rename(columns = {metric: names[i]}).set_index('Model Name')
+        dfs.append(df)
+    df = pd.concat(dfs, axis = 1)
+    df.reset_index(inplace = True)
+    
+    names = [names[i] for i in datasets]
+    plotColumns(df, names, use_range, reference_model = reference_model, plot_aspect = plot_aspect)
+    
+
+def plotColumns(df, columns, use_range = False, reference_model = 0, plot_aspect = None):
+    """
+    Plots a bar chart showing the mean and standard deviation (or range) of each
+    columns of the batch prediction results. Bars are grouped by the different model names
+    Helper function for plotMetricsByModel and plotPerformanceOnDatasetsByModel
+    
+    Arguments:
+        df -- pandas DataFrame 
+        columns -- List of strings. Each element is a column name of the DataFrame,
+                   and will be plotted as a bar for each of the model names
+        use_range  -- If True, the range is plotted as asymmetric error bars instead of the standard deviation
+        reference_model
+        plot_aspect
+    """
+    g = df[columns + ['Model Name']].groupby('Model Name')
     mean = g.mean()
-    std = g.std()
+    
+    if use_range:
+        lower = np.expand_dims((mean - g.min()).values.T, axis = 1)
+        upper = np.expand_dims((g.max() - mean).values.T, axis = 1)
+        std = np.concatenate((lower, upper), axis = 1)
+    else:
+        std = np.expand_dims(g.std().values.T, axis = 1)
 
     ax = plt.axes()
-    ax.set_aspect(10)
+    if plot_aspect is not None:
+        ax.set_aspect(plot_aspect)
 
-    p = ax.plot((-1,19), [mean.iloc[0]['True Positives']] * 2, '--', alpha = 1, linewidth = 1, zorder = -1)
-    ax.plot((-1,19), [mean.iloc[0]['True Positives'] + std.iloc[0]['True Positives']] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
-    ax.plot((-1,19), [mean.iloc[0]['True Positives'] - std.iloc[0]['True Positives']] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
-    p = ax.plot((-1,19), [mean.iloc[0]['False Positives']] * 2, '--', alpha = 1, linewidth = 1, zorder = -1)
-    ax.plot((-1,19), [mean.iloc[0]['False Positives'] + std.iloc[0]['False Positives']] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
-    ax.plot((-1,19), [mean.iloc[0]['False Positives'] - std.iloc[0]['False Positives']] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
+    # Plot horizontal lines highlighting the mean and standard deviation (or range) of the reference model (usually should be the first model, for comparison)
+    if reference_model is not None:
+        j = reference_model
+        for i, column in enumerate(columns):
+            p = ax.plot((-1,19), [mean.iloc[j][column]] * 2, '--', alpha = 1, linewidth = 1, zorder = -1)
+            ax.plot((-1,19), [mean.iloc[j][column] + std[i][-1][j]] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
+            ax.plot((-1,19), [mean.iloc[j][column] - std[i][0][j]] * 2, ':', alpha = 1, linewidth = 1, zorder = -1, color = p[-1].get_color())
 
+    # Plot the performance of each model as a bar chart with error bars
     mean.plot.bar(width = 0.75, ax = ax, zorder = 1,
-        yerr = std.values.T, error_kw = {'elinewidth': 0.5, 'capthick': 0.5, 'ecolor': 'black', 'capsize': 1})
+        yerr = std.squeeze(), error_kw = {'elinewidth': 0.5, 'capthick': 1, 'ecolor': 'black', 'capsize': 2})
     plt.ylim(0, 1)
     plt.legend(loc='lower left', fontsize = 'small', framealpha = 1, frameon = True)
-    plt.xlabel('Model Name')
-
+    
+    plt.tight_layout()
     plt.show()
+
 
 
 def plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True):
     """
-    Plots a heatmap representation of the 2D probability matrix arranged by peak time (and ground truth group if 'sort_by_group' = True)
+    Plots a heatmap representation of the 2D probability matrix with the order of the peaks
+    arranged by their RT (and also the ground truth group if 'sort_by_group' = True)
     
     Arguments:
         prediction -- Numpy array giving a column vector of probabilities (from the main output of ChromAlignNet)
         comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
-        info_df -- DataFrame containing information about each peak
+        info_df -- DataFrame containing information about each peak, in particular the peak times and their assigned ground truth group
         threshold -- None or a Float between 0 and 1.
-                     If it is a float, the plot shows the outcome of a binary classifier, with the decision threshold set at this values
+                     If it is a float, the plot shows the outcome of a binary classifier, with the decision threshold set at this value
         sort_by_group -- If True, the peaks will be sorted by ascending ground truth groups as well as peak retention time.
                          Red lines will be drawn to show the boundary between different groups
                          If False, sorting will only occur by peak retention time. No red lines will be drawn
         highlight_negative_group -- If True, peaks belonging to groups with negative group ID will be highlighted
-                                    by setting their values in the lower triangle of the matrix to 0
+                                    by setting their values in the lower triangle of the probability matrix to 0
     """
     if sort_by_group:
-        #Assign unique numbers to the -1 group peaks
+        # Assign unique group numbers to the -1 group peaks, so that they can be sorted independently
         max_group = info_df['Group'].max()
         neg_groups = info_df['Group'] < 0
         info_df['New_Group'] = info_df['Group']
         info_df.loc[neg_groups, 'New_Group'] = range(max_group + 1, max_group + 1 + neg_groups.sum())
         
-        sorted_groups = info_df.groupby('New_Group').mean().sort_values('peakMaxTime').index  # Gives the ordering of the groups sorted by average peak RT
-        sorted_groups_dict = dict(zip(sorted_groups, range(len(sorted_groups))))  # Mapping between the old group ID and new group ID based on the sort order
+        sorted_groups = info_df.groupby('New_Group').mean().sort_values('peakMaxTime').index  # This gives the order of the groups when sorted by average peak RT
+        sorted_groups_dict = dict(zip(sorted_groups, range(len(sorted_groups))))  # Mapping between the old group ID and the new group ID based on the sort order
         tmp_df = pd.concat([info_df['New_Group'].map(sorted_groups_dict), info_df['peakMaxTime']], axis = 1)
-        idx_arrangement = tmp_df.sort_values(by = ['New_Group', 'peakMaxTime']).index # Sort by Group, then peakMaxTime
+        idx_arrangement = tmp_df.sort_values(by = ['New_Group', 'peakMaxTime']).index  # Sort first by Group, then by peakMaxTime
     else:
         idx_arrangement = info_df.sort_values('peakMaxTime').index
-    idx_arrangement_dict = dict(zip(idx_arrangement, range(len(idx_arrangement)) ))
+    # This gives a new ordering for the peaks by mapping from the previous peak ID
+    # (the index of the info_df) to the new ID based on the sort order
+    idx_arrangement_dict = dict( zip( idx_arrangement, range(len(idx_arrangement)) ) )
     
+    # Create an empty matrix to store the pairwise probabilities of each peak matching each other peak
     number_of_peaks = len(info_df)
+    probability_matrix = np.zeros((number_of_peaks, number_of_peaks))
+    np.fill_diagonal(probability_matrix, 1)  # Diagonals are assigned a probability of 100%
     
-    prediction_matrix = np.zeros((number_of_peaks, number_of_peaks))
-    np.fill_diagonal(prediction_matrix, 1)
-    
+    # Fill the probability matrix using the prediction output from ChromAlignNet
     for i, (x1, x2) in enumerate(comparisons):
-        x1_ = idx_arrangement_dict[x1]
+        x1_ = idx_arrangement_dict[x1]  # Get the new peak ID from the old
         x2_ = idx_arrangement_dict[x2]
-        prediction_matrix[x1_, x2_] = prediction_matrix[x2_, x1_] = prediction[i]
-        if highlight_negative_group and info_df.loc[x1, 'Group'] < 0 and info_df.loc[x2, 'Group'] < 0:  # Highlight peaks with a negative group by not plotting below the diagonal when both peaks are negative
+        probability_matrix[x1_, x2_] = probability_matrix[x2_, x1_] = prediction[i]
+        # If highlight_negative_group is True, combinations where both peaks are from negative groups
+        # are only plotted in the upper diagonal (the value in the lower diagonal is set to 0)
+        if highlight_negative_group and info_df.loc[x1, 'Group'] < 0 and info_df.loc[x2, 'Group'] < 0:
             if x1_ < x2_:
-                prediction_matrix[x2_, x1_] = 0
+                probability_matrix[x2_, x1_] = 0
             else:
-                prediction_matrix[x1_, x2_] = 0
+                probability_matrix[x1_, x2_] = 0
 
     if threshold is not None:
-        prediction_matrix = prediction_matrix > threshold
+        probability_matrix = probability_matrix > threshold
     
-    max_time = info_df['peakMaxTime'].max()
-    min_time = info_df['peakMaxTime'].min()
-    plt.imshow(prediction_matrix, extent = None if sort_by_group else (min_time, max_time, max_time, min_time))
-    
+    # Plot the probability matrix as a heatmap
+    plt.imshow(probability_matrix)
+    plt.xlabel('Index')
+    plt.ylabel('Index')
     
     dataset_name = prediction_options['dataset_name']
     if threshold is not None:
@@ -265,124 +256,125 @@ def plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, so
         plt.title('{}'.format(dataset_name))
         plt.colorbar(label = 'Probability')
         
-    if sort_by_group:
+    if sort_by_group:  # Split each group with red lines
         new_idx_groups = info_df.loc[idx_arrangement, 'Group'].values
-        group_change_idx = np.flatnonzero( np.diff(new_idx_groups) )  # Gives last idx before (non-negative) group change, zero indexed
+        group_change_idx = np.flatnonzero( np.diff(new_idx_groups) )  # This gives the last idx values
+        # before group change (zero indexed). 'Group' instead of 'New_Group' is used so that consecutive peaks
+        # from negative groups are treated as part of the same block
         for x in group_change_idx:
-            plt.axvline(x=x+0.5, c = 'red', linewidth = 1, alpha = 1)
-            plt.axhline(y=x+0.5, c = 'red', linewidth = 1, alpha = 1)
-        plt.xlabel('Index')
-        plt.ylabel('Index')
-    else:
-        plt.xlabel('Min')
-        plt.ylabel('Min')
+            plt.axvline(x = x + 0.5, c = 'red', linewidth = 1, alpha = 1)
+            plt.axhline(y = x + 0.5, c = 'red', linewidth = 1, alpha = 1)
+    
 
 
-
-def printLastValues(history, std = None, kind = 'loss'):
+def plotHistory(measure = 'loss', all_reps = False, model_file = None, ax = None):
     """
-    Prints to the console the last values of the history
+    Plots the history over epoches of the model.
+    One or more measures (eg. the loss) can be selected.
+    If all_reps is set to True, the average across the repetitions is plotted instead. 
     
     Arguments:
-        history -- DataFrame of the history over epoches of the model,
-                   with the loss and accuracy of the various components as columns
-        std -- None or a DataFrame giving the standard deviation of the history over epoches
-        kind -- The component(s) of the history to print, as a string or a list of strings
+        model_file -- None, or the name of the model file, ie something like 'ChromAlignNet-H-01-r01'
+                      If None, the one specified in the prediction options will be used
+        measure -- The component(s) of the history to plot, defined as a string or a list of strings
+                   If a list of strings is used, multiple component will be drawn within the same figure
+                   The available components are:
+                       loss
+                       main_prediction_loss, mass_prediction_loss, peak_prediction_loss, chromatogram_prediction_loss,
+                       val_main_prediction_loss, val_mass_prediction_loss, val_peak_prediction_loss, val_chromatogram_prediction_loss,
+                       main_prediction_acc, mass_prediction_acc, peak_prediction_acc, chromatogram_prediction_acc,
+                       val_main_prediction_acc, val_mass_prediction_acc, val_peak_prediction_acc, val_chromatogram_prediction_acc
+        all_reps -- If True, plots the mean and standard deviation across all repetitions of the model
     """
-    def formatHistoryLabels(label):
-        """
-        Formats the labels of the different output contained within the model history
-        
-        Arguments:
-            label -- The history label to format, as a string
-        
-        Returns:
-            formatted_label -- The label formatted for printing to the console or for use in a plot legend
-        """
-        if label == 'loss':
-            return 'Total Loss'
-        label_components = label.split('_')
-        output = []
-        if label_components[0] == 'val':
-            output.append('Validation')
-        output.append(label_components[-3].capitalize())
-        if label_components[-3] != 'main':
-            output.append('Encoder')
-        output.append('Loss' if label_components[-1] == 'loss' else 'Accuracy')
-        
-        formatted_label = ' '.join(output)
-        return formatted_label
+    model_file = model_file or prediction_options['model_file']  # Uses what's in the preferences as the default
+    if measure == 'acc':
+        measure = ['main_prediction_acc', 'val_main_prediction_acc']
+    if isinstance(measure, str):
+        measure = [measure]  # Makes sure that measure is a list
     
-    print("Last Values:")
-    if isinstance(kind, str):
-        kind = [kind]
-    formatted_labels = []
-    for k in kind:
-        end = ' ± {:.4f}'.format(std.iloc[-1][k]) if std is not None else ""
-        formatted_labels.append(formatHistoryLabels(k))
-        print('{}: {:.4f}'.format(formatted_labels[-1], history.iloc[-1][k]) + end)
-    return formatted_labels
-
-
-def plotHistory(kind = 'loss', all_reps = False):
-    """
-    Plots the history over epoches of the model
-    
-    Arguments:
-        kind -- The component(s) of the history to plot, defined as a string or a list of strings
-                If a list of strings is used, multiple component will be drawn within the same figure
-                The available components are:
-                    loss
-                    main_prediction_loss, mass_prediction_loss, peak_prediction_loss, chromatogram_prediction_loss,
-                    val_main_prediction_loss, val_mass_prediction_loss, val_peak_prediction_loss, val_chromatogram_prediction_loss,
-                    main_prediction_acc, mass_prediction_acc, peak_prediction_acc, chromatogram_prediction_acc,
-                    val_main_prediction_acc, val_mass_prediction_acc, val_peak_prediction_acc, val_chromatogram_prediction_acc
-        all_reps -- If True, plots the mean and standard deviation across all (10) repetitions of the model
-    """
-    if kind == 'acc':
-        kind = ['main_prediction_acc', 'val_main_prediction_acc']
-    if isinstance(kind, str):
-        kind = [kind]
+    # If all_reps is true, replace the '-r01' part of the file name to each of the repetitions in turn
+    # The mean and standard deviation are taken, and error bars will be drawn
     if all_reps:
         histories = []
         for rep in batch_prediction_options['model_repeats']:
-            f = '{}/{}-r{:02}-History.csv'.format(prediction_options['model_path'], prediction_options['model_file'][:-4], rep)
+            f = '{}/{}-r{:02}-History.csv'.format(prediction_options['model_path'], model_file[:-4], rep)
             df = pd.read_csv(f, index_col = 0)
             histories.append(df)
         df = pd.concat(histories, axis = 0)
         g = df.groupby(df.index)
         history = g.mean()
         std = g.std()
-        formatted_labels = printLastValues(history, std, kind = kind)
-        error_kw = {'elinewidth': 1, 'capthick': 1, 'capsize': 2, 'errorevery': len(history) // 50}
+        formatted_labels = printLastValues(history, std, measure = measure)
+        error_kw = {'elinewidth': 1, 'capthick': 1, 'capsize': 2, 'errorevery': len(history) // 50}  # Draw just 50 error bars across the plot
     else:
-        history_file = '{}/{}-History.csv'.format(prediction_options['model_path'], prediction_options['model_file'])
+        history_file = '{}/{}-History.csv'.format(prediction_options['model_path'], model_file)
         history = pd.read_csv(history_file, index_col = 0)
-        formatted_labels = printLastValues(history, None, kind = kind)
-        error_kw = {}
-    history[kind].plot(linewidth = 2, yerr = std[kind] if all_reps else None, **error_kw)
+        formatted_labels = printLastValues(history, None, measure = measure)
+        error_kw = {}  # No error bar options
+    
+    # Draw the plot
+    history[measure].plot(linewidth = 2, yerr = std[measure] if all_reps else None, ax = ax, **error_kw)
     plt.legend(formatted_labels)
     plt.xlabel('Epochs')
 
 
-def plotSubnetworkHistory(kind = 'acc', all_reps = False):
+def plotHistoryAcrossModels(model_names, measure = 'loss', all_reps = True):
     """
-    Plots the history of each sub-network using the plotHistory function
+    Plots the history over epochs of several models by making multiple calls to
+    the plotHistory function.
+    Only one measure should be specified, to avoid confusion, since the legend of
+    the plot refers to model names.
+    If all_reps is set to True, the average across the repetitions is plotted instead.
     
     Arguments:
-        kind -- which component of the history to plot, defined as a string ('acc', 'loss', 'val_acc' or 'val_loss')
-        all_reps -- If True, plots the mean and standard deviation across all (10) repetitions of the model
+        model_names -- List of the names of the models to plot. The model prefix
+                       and repetition number can be specified but is unnecessary.
+                       Do not include the model_path - it is taken from the parameters
+        measure -- The component of the history to plot. Should be a string, not a list, to avoid confusion
+        all_reps -- If True, plots the mean and standard deviation across all repetitions of the models
     """
-    if kind.endswith('acc'):
-        k = ['main_prediction_acc', 'mass_prediction_acc', 'peak_prediction_acc', 'chromatogram_prediction_acc']
-    if kind.endswith('loss'):
-        k = ['main_prediction_loss', 'mass_prediction_loss', 'peak_prediction_loss', 'chromatogram_prediction_loss']
-    if kind.startswith('val'):
-        k = ['val_' + i for i in k]
-    plotHistory(k, all_reps)
-    plt.ylabel('Accuracy' if kind.endswith('acc') else 'Loss')
+    # Format the model names correctly so that they can be recognised by plotHistory
+    new_model_names = []
+    for model_name in model_names:
+        if not model_name.startswith('ChromAlignNet'):
+            model_name = 'ChromAlignNet-' + model_name
+        if model_name[-3] != 'r':
+            model_name = model_name + '-r01'  # Default to the first repetition
+        new_model_names.append(model_name)
+    
+    # Do not show the model prefix in the legend. Also if all_reps=True, do not show the rep number
+    if all_reps:
+        model_short_name = [n[14:-4] for n in new_model_names]
+    else:
+        model_short_name = [n[14:] for n in new_model_names]
+
+    ax = plt.axes()
+    for i, model_file in enumerate(new_model_names):
+        print(model_short_name[i], end = ' ')
+        plotHistory(measure = measure, all_reps = all_reps, model_file = model_file, ax = ax)
+    
+    plt.legend(model_short_name)  # Replace the legend with a new one
 
 
+def plotSubnetworkHistory(measure = 'acc', all_reps = False):
+    """
+    Plots the history of each sub-network by calling the plotHistory function.
+    One of four plots can be drawn, specified by setting the 'measure' parameter.
+    The plot can focused on either accuracy or loss, of either the training
+    or validation set.
+    
+    Arguments:
+        measure -- The component of the history to plot, defined as a string ('acc', 'loss', 'val_acc' or 'val_loss')
+        all_reps -- If True, plots the mean and standard deviation across all repetitions of the model
+    """
+    if measure.endswith('acc'):
+        ms = ['main_prediction_acc', 'mass_prediction_acc', 'peak_prediction_acc', 'chromatogram_prediction_acc']
+    if measure.endswith('loss'):
+        ms = ['main_prediction_loss', 'mass_prediction_loss', 'peak_prediction_loss', 'chromatogram_prediction_loss']
+    if measure.startswith('val'):
+        ms = ['val_' + i for i in ms]
+    plotHistory(ms, all_reps)
+    plt.ylabel('Accuracy' if measure.endswith('acc') else 'Loss')
 
 
 
@@ -392,16 +384,18 @@ if __name__ == "__main__":
                                                                                                 prediction_options['sequence_file'], take_chromatogram_log = False)
     prediction, comparisons = loadPredictions(prediction_options['predictions_save_name'])
     
-    ###
-    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
-    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
-    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, number = 5).ravel()
-    incorrect = np.unique(incorrect)
-    plotPeaksByIndex(incorrect, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
-    
+#    ###
+#    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
+#    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
+#    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, number = 5).ravel()
+#    incorrect = np.unique(incorrect)
+#    plotPeaksByIndex(incorrect, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
+#    
 
-    plotPerformanceByModel(prediction_options['dataset_name'])
+#    plotMetricsByModel(prediction_options['dataset_name'], metrics = ['True Positives', 'False Positives', 'F1'])
+#    plotPerformanceOnDatasetsByModel(datasets = [10,11], metric = 'False Positives', reference_model = 0)
     plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True)
-    plotHistory('loss', True)
-    plotSubnetworkHistory('val_acc', False)
+#    plotHistory('loss', False)
+#    plotSubnetworkHistory('val_acc', False)
+#    plotHistoryAcrossModels(model_names = ['H-02', 'H-32', 'I-32'], measure = 'val_main_prediction_acc', all_reps = True)
 

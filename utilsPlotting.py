@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-### Plotting
+
 def plotSpectrum(times, files, peak_intensity, resolution = 1/300, buffer = 5,
                  min_time = None, max_time = None, ax = None, clip = 1E4):
     """
@@ -50,6 +50,7 @@ def plotSpectrum(times, files, peak_intensity, resolution = 1/300, buffer = 5,
     ax.get_yaxis().set_visible(False)
     
     return pcm
+
 
 def plotSpectrumTogether(info_df, peak_intensity, with_real = False, save_name = None):
     """
@@ -196,3 +197,98 @@ def plotPeaksTogether(info_df, peak_df, with_real = False, save_name = None, sav
         df_tmp = pd.DataFrame(time)
         df_tmp.to_csv("time.csv", index=False)        
 
+
+def plotPeaksByIndex(info_df, peak_df_orig, mass_profile_df, chromatogram_df,
+                     index = None, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False):
+    """
+    Plots several views of one or more peaks
+    Views of the peak profiles, mass spectra and chromatogram segments are shown
+    
+    Arguments:
+        index -- None or a list of IDs of the peaks to be plotted (peak IDs correspond to the index of the info_df DataFrame)
+                 If index is None then input is given from the console and are added successively to a list until a blank input is given
+        margin -- The number of time steps to either side of the average retention time to plot in the chromatogram segment figure
+        plot_log_sequence -- If True, produces an additional figure of the chromatogram segment on a semi-log plot
+        read_clipboard -- If True, the clipboard is read to get the list of peak ID values
+        plot_as_subplots -- If True, produces subplots in one figure instead of separate figures
+    """
+    if plot_as_subplots:
+        fig, axes = plt.subplots(2,2)
+    else:
+        axes = np.array([[None] * 2, [plt] * 2], dtype=np.object)
+    
+    if index is None:
+        if read_clipboard:
+            index = pd.read_clipboard(header = None).squeeze().tolist()
+        else:
+            index = []
+            while True:
+                i = input("Index:")
+                if i == '': break
+                else: index.append(int(i))
+    print(info_df.loc[index])
+    peak_df_orig.loc[index].transpose().plot(ax = axes[0,0])
+    if plot_as_subplots:
+        axes[0,0].ticklabel_format(scilimits = (0,3))
+        axes[0,0].set_title('Peak profile', fontdict = {'fontsize': 18})
+    else:
+        plt.title('Peak profile')
+        
+    mass_profile_df.loc[index].transpose().plot(ax = axes[0,1])
+    if plot_as_subplots:
+        axes[0,1].ticklabel_format(scilimits = (0,3))
+        axes[0,1].set_title('Mass spectrum at the time of peak maximum', fontdict = {'fontsize': 18})
+        axes[0,1].set_xlabel('m/z', fontdict = {'fontsize': 12})
+    else:
+        plt.title('Mass spectrum at the time of peak maximum')
+        plt.figure()
+    
+    chrom_idx = np.argmin(np.abs(chromatogram_df.columns - np.mean(info_df.loc[index]['peakMaxTime'])).values)
+    axes[1,0].plot(chromatogram_df.iloc[:, max(0,chrom_idx - margin) : chrom_idx + margin].transpose(), 'gray', alpha = 0.2, label = '_nolegend_')
+    for i, file in enumerate(info_df.loc[index]['File']):
+        p = axes[1,0].plot(chromatogram_df.iloc[file, max(0,chrom_idx - margin) : chrom_idx + margin].transpose(), linewidth=3, label = index[i])
+        # Plot line to the top of the peak at 'peakMaxTime'. Helps keep track of which peak to look at
+        axes[1,0].plot((info_df.loc[index[i]]['peakMaxTime'], info_df.loc[index[i]]['peakMaxTime']),
+                  (0, max(peak_df_orig.loc[index[i]])), color = p[-1].get_color(), label = '_nolegend_')
+    axes[1,0].legend()
+    axes[1,0].ticklabel_format(scilimits = (0,3))
+    if plot_as_subplots:
+        axes[1,0].set_title('Chromatogram segment', fontdict = {'fontsize': 18})
+        axes[1,0].set_xlabel('Retention Time (min)', fontdict = {'fontsize': 12})
+    else:
+        plt.title('Chromatogram segment')
+        plt.figure()
+    
+    if plot_log_sequence:
+        axes[1,1].plot(chromatogram_df.iloc[:, max(0,chrom_idx - margin) : chrom_idx + margin].transpose(), 'gray', alpha = 0.2, label = '_nolegend_')
+        for i, file in enumerate(info_df.loc[index]['File']):
+            segment = chromatogram_df.iloc[file, max(0,chrom_idx - margin) : chrom_idx + margin].transpose()
+            segment = segment[segment != 0]
+            p = axes[1,1].semilogy(segment, linewidth=3, label = index[i])
+            # Plot line to the top of the peak at 'peakMaxTime'. Helps keep track of which peak to look at
+            axes[1,1].semilogy((info_df.loc[index[i]]['peakMaxTime'], info_df.loc[index[i]]['peakMaxTime']),
+                      (np.min(segment), max(peak_df_orig.loc[index[i]])), color = p[-1].get_color(), label = '_nolegend_')
+        axes[1,1].legend()
+        if plot_as_subplots:
+            axes[1,1].set_title('Chromatogram segment - log scale', fontdict = {'fontsize': 18})
+            axes[1,1].set_xlabel('Retention Time (min)', fontdict = {'fontsize': 12})
+            plt.show()
+        else:
+            plt.title('Chromatogram segment - log scale')
+
+
+def plotPeakRTInGroups(info_df, group_col = 'Group', alpha = 0.2):
+    """
+    """
+    g = info_df[[group_col, 'peakMaxTime']].groupby(group_col)
+    max_in_group = g.max()
+    min_in_group = g.min()
+    max_group = info_df[group_col].max()
+    
+    plt.scatter(info_df[group_col], info_df['peakMaxTime'])
+    plt.xlabel('Group Number (-1 is ignored)')
+    plt.ylabel('Time of Peak (min)')
+    plt.title('Time of Peak Against Group Number')
+    for i in range(max_group + 1):
+        plt.plot((0, max_group), (max_in_group.loc[i], max_in_group.loc[i]), 'b', alpha = alpha)
+        plt.plot((0, max_group), (min_in_group.loc[i], min_in_group.loc[i]), 'g', alpha = alpha)

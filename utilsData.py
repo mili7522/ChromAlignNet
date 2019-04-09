@@ -205,6 +205,7 @@ def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, ran
     else:
         return comparisons
 
+
 def getRealGroupAssignments(info_df):
     """
     Identifies the group which has been manually assigned to each peak (ground truth)
@@ -321,3 +322,48 @@ def getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, sa
     incorrect = p != truth
     incorrect_array = comparisons[incorrect][:sample_size]
     return incorrect_array
+
+
+def printLastValues(history, std = None, kind = 'loss'):
+    """
+    Prints to the console the last values of the history
+    
+    Arguments:
+        history -- DataFrame of the history over epoches of the model,
+                   with the loss and accuracy of the various components as columns
+        std -- None or a DataFrame giving the standard deviation of the history over epoches
+        kind -- The component(s) of the history to print, as a string or a list of strings
+    """
+    def formatHistoryLabels(label):
+        """
+        Formats the labels of the different output contained within the model history
+        
+        Arguments:
+            label -- The history label to format, as a string
+        
+        Returns:
+            formatted_label -- The label formatted for printing to the console or for use in a plot legend
+        """
+        if label == 'loss':
+            return 'Total Loss'
+        label_components = label.split('_')
+        output = []
+        if label_components[0] == 'val':
+            output.append('Validation')
+        output.append(label_components[-3].capitalize())
+        if label_components[-3] != 'main':
+            output.append('Encoder')
+        output.append('Loss' if label_components[-1] == 'loss' else 'Accuracy')
+        
+        formatted_label = ' '.join(output)
+        return formatted_label
+    
+    print("Last Values:")
+    if isinstance(kind, str):
+        kind = [kind]
+    formatted_labels = []
+    for k in kind:
+        end = ' ± {:.4f}'.format(std.iloc[-1][k]) if std is not None else ""
+        formatted_labels.append(formatHistoryLabels(k))
+        print('{}: {:.4f}'.format(formatted_labels[-1], history.iloc[-1][k]) + end)
+    return formatted_labels
