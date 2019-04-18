@@ -379,12 +379,12 @@ def plotSubnetworkHistory(measure = 'acc', all_reps = False):
 
 
 if __name__ == "__main__":
-
+    ## Load data
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(prediction_options['data_path'], prediction_options['info_file'],
                                                                                                 prediction_options['sequence_file'], take_chromatogram_log = False)
     prediction, comparisons = loadPredictions(prediction_options['predictions_save_name'])
     
-#    ###
+    ## Make plots
 #    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
 #    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
 #    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, number = 5).ravel()

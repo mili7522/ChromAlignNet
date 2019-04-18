@@ -7,44 +7,45 @@ class ChromAlignModel:
     """
     Model definitions for ChromAlignNet. Specified and built using Keras
     """
-    def __init__(self, mass_network_neurons = 64, peak_network_neurons = 64, chromatogram_network_neurons = 64,
+    def __init__(self, mass_network_neurons = 64, peak_network_neurons = 64, initial_convolution_filter_number = 3,
                  mass_encoder_neurons = 10, peak_encoder_neurons = 10, chromatogram_encoder_neurons = 10,
                  mass_dropout_percentage = 0.2, peak_dropout_percentage = 0.2, chromatogram_dropout_percentage = 0.2,
                  number_of_left_convolution_stacks = 4, number_of_right_convolution_stacks = 3,
                  chromatogram_convolution_dropout_percentage = 0, combined_output_neurons = 64,
-                 combined_output_dropout_percentage = 0.2, initial_convolution_filter_number = 3,
-                 ignore_peak_profile = False):
-        self.mass_network_neurons = mass_network_neurons
-        self.peak_network_neurons = peak_network_neurons
-        self.chromatogram_network_neurons = chromatogram_network_neurons
-        self.mass_encoder_neurons = mass_encoder_neurons
-        self.peak_encoder_neurons = peak_encoder_neurons
-        self.chromatogram_encoder_neurons = chromatogram_encoder_neurons
-        self.mass_dropout_percentage = mass_dropout_percentage
-        self.peak_dropout_percentage = peak_dropout_percentage
-        self.chromatogram_dropout_percentage = chromatogram_dropout_percentage
-        self.number_of_left_convolution_stacks = number_of_left_convolution_stacks
-        self.number_of_right_convolution_stacks = number_of_right_convolution_stacks
-        self.chromatogram_convolution_dropout_percentage = chromatogram_convolution_dropout_percentage
-        self.combined_output_neurons = combined_output_neurons
-        self.combined_output_dropout_percentage = combined_output_dropout_percentage
-        self.initial_convolution_filter_number = initial_convolution_filter_number
-        self.ignore_peak_profile = ignore_peak_profile
+                 combined_output_dropout_percentage = 0.2, ignore_peak_profile = False):
+        self.mass_network_neurons = mass_network_neurons  # Number of neurons in the first two layers of the mass encoder
+        self.peak_network_neurons = peak_network_neurons  # Number of units in the LSTM of the peak encoder. Gives the dimensionality of the output space
+        self.initial_convolution_filter_number = initial_convolution_filter_number  # Number of output neurons in the first convolutional layer of the chromatogram encoder. This number doubles per convolutional layer
+        self.mass_encoder_neurons = mass_encoder_neurons  # Number of neurons in the final layer of the mass encoder
+        self.peak_encoder_neurons = peak_encoder_neurons  # Number of neurons in the final layer of the peak encoder
+        self.chromatogram_encoder_neurons = chromatogram_encoder_neurons  # Number of neurons in the final layer of the chromatogram encoder
+        self.mass_dropout_percentage = mass_dropout_percentage  # The value of dropout applied between each layer of the mass encoder
+        self.peak_dropout_percentage = peak_dropout_percentage  # The value of dropout applied between each LSTM layer of the peak encoder
+        self.chromatogram_dropout_percentage = chromatogram_dropout_percentage  # The value of dropout applied after the concatonation of the two convolution stacks
+        self.number_of_left_convolution_stacks = number_of_left_convolution_stacks  # The number of CONV - CONV - MAXPOOL sequences in the left convolution stack
+        self.number_of_right_convolution_stacks = number_of_right_convolution_stacks  # The number of CONV - MAXPOOL layers sequences in the right convolution stack
+        self.chromatogram_convolution_dropout_percentage = chromatogram_convolution_dropout_percentage  # The value of dropout applied after each max pooling operation within each convolution stack
+        self.combined_output_neurons = combined_output_neurons  # The number of neurons in the fully connected layer after combining each encoder and the time-based peak information
+        self.combined_output_dropout_percentage = combined_output_dropout_percentage  # The value of dropout applied after combining each encoder and the time-based peak information
+        self.ignore_peak_profile = ignore_peak_profile  # If True, the peak encoder is not included as part of the model
 
     def makeSiameseComponent(self, encoder_model, left_input, right_input):
         """
-        Creates a Siamese sub-network given an encoder
+        Creates a Siamese sub-network given an encoder model and an input for each of the two branches
         """
         left_branch = encoder_model(left_input)
         right_branch = encoder_model(right_input)
         
-        # Merge and compute L1 distance
+        # Merge and compute absolute element-wise distance
         comparison = Subtract()([left_branch, right_branch])
         comparison = Lambda(lambda x: K.abs(x))(comparison)
 
         return comparison
 
     def buildMassEncoder(self, mass_input_shape):
+        """
+        Creates a model for a mass encoder using three fully connected layers
+        """
         mass_encoder = Sequential()
         mass_encoder.add(Dense(self.mass_network_neurons, input_shape = mass_input_shape, activation = 'relu'))
         mass_encoder.add(Dropout(self.mass_dropout_percentage))
@@ -56,6 +57,8 @@ class ChromAlignModel:
         
     
     def buildMassSiamese(self, max_mass_seq_length):
+        """
+        """
         mass_input_shape = (max_mass_seq_length,)
         mass_left_input = Input(mass_input_shape)
         mass_right_input = Input(mass_input_shape)
@@ -139,7 +142,7 @@ class ChromAlignModel:
 
     def buildModel(self, max_mass_seq_length, segment_length):
         """
-        Creates model
+        Creates the overall model
         """
         mass_left_input, mass_right_input, mass_comparison, mass_prediction = self.buildMassSiamese(max_mass_seq_length)
         if not self.ignore_peak_profile:

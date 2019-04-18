@@ -10,7 +10,7 @@ from plotResults import plotAlignments
 from modelDefinition import getModelVariant
 from parameters import prediction_options
 
-
+# Create the output folder if it doesn't already exist
 os.makedirs(prediction_options['results_path'], exist_ok = True)
 
 
@@ -33,10 +33,11 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
     """
     load_time = time.time()
 
+    # Load the data
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path,
                                                                                                 prediction_options['info_file'],
                                                                                                 prediction_options['sequence_file'])
-    real_groups_available = 'Group' in info_df  # Check if ground truth groups have been assigned
+    real_groups_available = 'Group' in info_df  # Check if ground truth groups have been assigned. Returns True or False
 
     # Remove null rows and negative indexed groups
     keep_index = (pd.notnull(mass_profile_df).all(1))
@@ -103,7 +104,7 @@ def runPrediction(prediction_data, model_file, verbose = 1, predictions_save_nam
     Arguments:
         prediction_data -- List of numpy arrays. Input data into the network
         model_file -- Name of the model, as a string
-        verbose -- 
+        verbose -- 0 = silent, 1 = progress bar
         predictions_save_name -- None or a string giving the name to save the prediction outcomes (as a csv file)
         comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
     

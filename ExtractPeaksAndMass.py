@@ -12,14 +12,14 @@ Creates a folder which acts as a self contined data set, holding information abo
 each peak (eg retention time of the peak maximum) and the peak profile and mass
 spectra at peak maximum in separate files numbered by the peak ID.
 
-Inputs (modified from the parameters.py file):
+Inputs (modified using the parameters.py file):
     data_path -- Path to the '0fullResults' output folder from peak detection (https://github.com/rosalind-wang/GCPeakDetection)
     masses -- List of mass values to extract peaks from
-    max_files_to_process -- The maximum number of files to extract from (int)
-    max_peaks_per_file -- The maximum number of peaks to extract per file (int)
+    max_files_to_process -- The maximum number of files (samples) to extract from, as an Int
+    max_peaks_per_file -- The maximum number of peaks to extract per file (sample), as an Int
     time_window -- Tuple of (start time, end time) in minutes. Peaks are only extracted within this window.
                    Can use (0, np.inf) to get the whole chromatogram
-    margin -- Number of time steps to add to either side of the time window when extracting 
+    margin -- Number of time steps to add to either side of the time window when extracting the chromatogram
     sort_by_peak_area -- If True, the peaks extracted per file are sorted by the area of the peak. Peaks with more area are extracted first
     peak_id_width -- Int specifying the number of digits in the peak id (padded by 0s).
                      Ensure that this in enough to cover the total number of peaks generated (eg 3 for up to 999 peaks)
