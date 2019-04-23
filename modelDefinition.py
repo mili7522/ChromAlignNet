@@ -36,7 +36,7 @@ class ChromAlignModel:
         left_branch = encoder_model(left_input)
         right_branch = encoder_model(right_input)
         
-        # Merge and compute absolute element-wise distance
+        # Merge and compute the element-wise absolute distance
         comparison = Subtract()([left_branch, right_branch])
         comparison = Lambda(lambda x: K.abs(x))(comparison)
 
@@ -44,7 +44,7 @@ class ChromAlignModel:
 
     def buildMassEncoder(self, mass_input_shape):
         """
-        Creates a model for a mass encoder using three fully connected layers
+        Creates a model for a mass encoder with three fully connected layers and dropout between each layer
         """
         mass_encoder = Sequential()
         mass_encoder.add(Dense(self.mass_network_neurons, input_shape = mass_input_shape, activation = 'relu'))
@@ -58,20 +58,32 @@ class ChromAlignModel:
     
     def buildMassSiamese(self, max_mass_seq_length):
         """
+        Creates a siamese (sub)-network built using the mass encoder.
+        Returns the two input tensors and the output tensor of the (sub)-network
+        as well as the predictive output using only this (sub)-network
         """
+        # Create input tensors
         mass_input_shape = (max_mass_seq_length,)
         mass_left_input = Input(mass_input_shape)
         mass_right_input = Input(mass_input_shape)
 
         mass_encoder = self.buildMassEncoder(mass_input_shape)
 
+        # Make the siamese (sub)-network and get the output tensor
         mass_comparison = self.makeSiameseComponent(mass_encoder, mass_left_input, mass_right_input)
+        
+        # The predictive output is made from a single neuron with a sigmoid activation function
         mass_prediction = Dense(1, activation = 'sigmoid', name = 'mass_prediction')(mass_comparison)
 
         return mass_left_input, mass_right_input, mass_comparison, mass_prediction
 
 
     def buildPeakEncoder(self):
+        """
+        Creates a model for a peak encoder as a bi-directional LSTM.
+        Three LSTM layers are used, with the first two being bi-directional.
+        The output from the LSTM layers are passed through a fully connected layer to get the encoding
+        """
         peak_input_shape = (None, 1)  # Variable sequence length
         P_in = Input(peak_input_shape)
         
@@ -80,7 +92,8 @@ class ChromAlignModel:
         P = Bidirectional(LSTM(self.peak_network_neurons, return_sequences = True))(P)
         P = Dropout(self.peak_dropout_percentage)(P)
         _, state_h, state_c = LSTM(self.peak_encoder_neurons, return_sequences = False, return_state = True)(P)
-        peak_output = Concatenate(axis = -1)([state_h, state_c])
+        
+        peak_output = Concatenate(axis = -1)([state_h, state_c])  # Use both the LSTM state and memory to get the encoding
         peak_output = Dropout(self.peak_dropout_percentage)(peak_output)
         peak_output = Dense(self.peak_encoder_neurons)(peak_output)
         
@@ -89,6 +102,9 @@ class ChromAlignModel:
         return peak_encoder
     
     def buildPeakSiamese(self):
+        """
+        Creates a siamese (sub)-network using the peak encoder. See comments in buildMassSiamese
+        """
         peak_input_shape = (None, 1)  # Variable sequence length
         peak_left_input = Input(peak_input_shape)
         peak_right_input = Input(peak_input_shape)
@@ -101,16 +117,22 @@ class ChromAlignModel:
         return peak_left_input, peak_right_input, peak_comparison, peak_prediction
 
     def buildChromatogramEncoder(self, chromatogram_input_shape):
+        """
+        Creates a model for a chromatogram encoder as a CNN with two separate stacks of convolutions
+        The output from the two stacks are combined and passed through a fully connected layer to get the encoding
+        """
         C_in = Input(chromatogram_input_shape)
         
         initial_filter_number = self.initial_convolution_filter_number
+        # Build up the left stack of convolutional layers
         for i in range(self.number_of_left_convolution_stacks):
+            # The number of convolutional filters doubles per group of layers
             F1 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F1)
             F1 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(F1)
-            F1 = MaxPooling1D(3 if i == 0 else 2)(F1)  # Segment length of 600, 200, 100, 50, etc
-            if (self.chromatogram_convolution_dropout_percentage != 0) and (i != (self.number_of_left_convolution_stacks - 1)):
+            F1 = MaxPooling1D(3 if i == 0 else 2)(F1)  # Segment length of 600, 200, 100, 50, etc (reduces to a third after the first group of layers, then halves after each following group of layers)
+            if (self.chromatogram_convolution_dropout_percentage != 0) and (i != (self.number_of_left_convolution_stacks - 1)):  # Don't apply dropout after the last group of layers
                 F1 = Dropout(self.chromatogram_convolution_dropout_percentage)(F1)
-                
+        # Build up the right stack of convolutional layers 
         for i in range(self.number_of_right_convolution_stacks):
             F2 = Conv1D(filters = initial_filter_number * (2**i), kernel_size = 3, strides = 1, padding = 'same', activation = 'relu')(C_in if i == 0 else F2)
             F2 = MaxPooling1D(3 if i == 0 else 2)(F2)  # Segment length of 600, 200, 100, 50, etc
@@ -119,7 +141,7 @@ class ChromAlignModel:
 
         F1 = Flatten()(F1)
         F2 = Flatten()(F2)
-        chromatogram_output = Concatenate(axis = -1)([F1, F2])
+        chromatogram_output = Concatenate(axis = -1)([F1, F2])  # Combine the output from the two stacks of convolutions to get the encoding
         chromatogram_output = Dropout(self.chromatogram_dropout_percentage)(chromatogram_output)
         chromatogram_output = Dense(self.chromatogram_encoder_neurons)(chromatogram_output)
         
@@ -128,6 +150,9 @@ class ChromAlignModel:
         return chromatogram_encoder
 
     def buildChromatogramSiamese(self, segment_length):
+        """
+        Creates a siamese (sub)-network using the chromatogram encoder. See comments in buildMassSiamese
+        """
         chromatogram_input_shape = (segment_length, 1)  # One channel input
         chromatogram_left_input = Input(chromatogram_input_shape)
         chromatogram_right_input = Input(chromatogram_input_shape)
@@ -142,12 +167,24 @@ class ChromAlignModel:
 
     def buildModel(self, max_mass_seq_length, segment_length):
         """
-        Creates the overall model
+        Creates the ChromAlignNet model using the Keras functional API
+        
+        Arguments:
+            max_mass_seq_length -- Number of data points in each mass spectra, as an Int
+                                   Will be set as the input size of the mass encoder
+            segment_length -- Number of time steps in the chromatogram segment, as an Int
+                              Will be set as the input size of the chromatogram encoder
+        
+        Returns:
+            model -- Keras model containing several siamese sub-networks
+                     Needs to be compiled before training
         """
+        # Create each siamese (sub)-network
         mass_left_input, mass_right_input, mass_comparison, mass_prediction = self.buildMassSiamese(max_mass_seq_length)
         if not self.ignore_peak_profile:
             peak_left_input, peak_right_input, peak_comparison, peak_prediction = self.buildPeakSiamese()
         chromatogram_left_input, chromatogram_right_input, chromatogram_comparison, chromatogram_prediction = self.buildChromatogramSiamese(segment_length)
+        # Also include the difference in retention times as another input
         time_diff = Input((1,))
 
         if self.ignore_peak_profile:
@@ -155,11 +192,13 @@ class ChromAlignModel:
         else:
             components = [mass_comparison, peak_comparison, chromatogram_comparison, time_diff]
 
+        # Concatonate all the outputs from each siamese (sub)-network together to do the main prediction
         combined_outputs = Lambda(lambda x: K.concatenate(x, axis = -1))(components)
         combined_outputs = Dropout(self.combined_output_dropout_percentage)(combined_outputs)
         combined_model = Dense(self.combined_output_neurons, activation = 'relu')(combined_outputs)
         combined_prediction = Dense(1, activation = 'sigmoid', name = 'main_prediction')(combined_model)
 
+        # Select the relevant inputs and outputs, based on if the peak encoder was used or not
         if self.ignore_peak_profile:
             inputs = [mass_left_input, mass_right_input, chromatogram_left_input, chromatogram_right_input, time_diff]
             outputs = [combined_prediction, mass_prediction, chromatogram_prediction]
@@ -167,6 +206,7 @@ class ChromAlignModel:
             inputs = [mass_left_input, mass_right_input, peak_left_input, peak_right_input, chromatogram_left_input, chromatogram_right_input, time_diff]
             outputs = [combined_prediction, mass_prediction, peak_prediction, chromatogram_prediction]
 
+        # Create the overall network with all of the inputs and outputs
         model = Model(inputs = inputs, outputs = outputs)
 
         return model
@@ -175,6 +215,7 @@ class ChromAlignModel:
 class SimplifiedPeakEncoderVariant(ChromAlignModel):
     """
     Variant of ChromAlignModel with a simplified peak encoder
+    Uni-directional GRU layers replaces the bi-directional LSTM layers
     """
     def buildPeakEncoder(self):
         peak_input_shape = (None, 1)  # Variable sequence length
@@ -196,13 +237,13 @@ class SimplifiedPeakEncoderVariant(ChromAlignModel):
 
 def getModelVariant(variant):
     """
-    Creates a specific model object with pre-specified parameters matching one of the variants defined
+    Initialises a ChromAlignModel (or similar) object with specific parameters matching a pre-specified variant
     
     Arguments:
         variant -- the model variant to select, given as an Int
     
     Returns:
-        model -- ChromAlignModel object constructed with specific parameters matching the variant requested    # model_obj?
+        model -- ChromAlignModel (or similar) object constructed with specific parameters matching the requested variant
     """
     switcher = {
         1: ChromAlignModel(),
