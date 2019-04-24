@@ -386,10 +386,10 @@ if __name__ == "__main__":
     
     ## Make plots
 #    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
-#    plotPeaksByIndex([2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
-#    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, number = 5).ravel()
+#    plotPeaksByIndex(info_df, peak_df_orig, mass_profile_df, chromatogram_df, [2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
+#    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, sample_size = 5).ravel()
 #    incorrect = np.unique(incorrect)
-#    plotPeaksByIndex(incorrect, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
+#    plotPeaksByIndex(info_df, peak_df_orig, mass_profile_df, chromatogram_df, incorrect, margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
 #    
 
 #    plotMetricsByModel(prediction_options['dataset_name'], metrics = ['True Positives', 'False Positives', 'F1'])
