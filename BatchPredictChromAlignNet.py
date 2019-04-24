@@ -6,7 +6,7 @@ import sys
 from PredictChromAlignNet import prepareDataForPrediction, runPrediction
 from parameters import prediction_options, batch_prediction_options
 from model_definition import getModelVariant
-from utils import calculateMetrics
+from utilsData import calculateMetrics
 
 """
 Runs the prediction script many times on one data set, over a range of model names,
