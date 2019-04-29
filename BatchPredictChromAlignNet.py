@@ -107,7 +107,7 @@ for i in model_variants:
             model_fullname_list.append(name + '-' + '{:02d}'.format(i))  # Full name of the model - eg 'H-01'
             
             if batch_prediction_options['save_individual_predictions']:
-                predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path_individual, model_file, batch_prediction_options['dataset_name'])
+                predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path_individual, model_file, batch_prediction_options['dataset_name'][dataset_number])
             else:
                 predictions_save_name = None
             
