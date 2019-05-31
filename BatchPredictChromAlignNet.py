@@ -5,7 +5,7 @@ import time
 import sys
 from PredictChromAlignNet import prepareDataForPrediction, runPrediction
 from parameters import prediction_options, batch_prediction_options
-from model_definition import getModelVariant
+from modelDefinition import getModelVariant
 from utilsData import calculateMetrics
 
 """
@@ -34,6 +34,8 @@ dataset_number = int(sys.argv[1])
 data_path = data_paths[dataset_number]
 
 calculate_f1_metric = prediction_options['calculate_f1_metric']  # If True, the F1 score is calculated as a metric as well as the true and false positives
+calculate_auc_metric = prediction_options['calculate_auc_metric']  # If True, the AUC is calculated as a metric as well
+calculate_average_precision_metric = prediction_options['calculate_average_precision_metric']  # If True, the average precision is calculated as a metric as well
 calculate_metrics_for_components = prediction_options['calculate_metrics_for_components']  # If True, metrics are calculated for the subnetwork outputs
 results_path = prediction_options['results_path']  # Path to save the summary output
 
@@ -75,16 +77,45 @@ sys.stdout.flush()  # Using manual flush to force the printing, for situations w
 
 # Determine the names of the metrics to save in the summary dataframe
 metric_names = ['True Positives', 'False Positives - Ignore Neg Idx', 'False Positives']
+mass_metric_names = ['TP-Mass', 'FP-IgnNeg-Mass', 'FP-Mass']
+peak_metric_names = ['TP-Peak', 'FP-IgnNeg-Peak', 'FP-Peak']
+chrom_metric_names = ['TP-Chrom', 'FP-IgnNeg-Chrom', 'FP-Chrom']
 if calculate_f1_metric:
     metric_names.extend(['Recall', 'Precision', 'F1'])
-    if calculate_metrics_for_components:
-        metric_names.extend(['TP-Mass', 'FP-IgnNeg-Mass', 'FP-Mass', 'Recall-Mass', 'Precision-Mass', 'F1-Mass',
-                             'TP-Peak', 'FP-IgnNeg-Peak', 'FP-Peak', 'Recall-Peak', 'Precision-Peak', 'F1-Peak',
-                             'TP-Chrom', 'FP-IgnNeg-Chrom', 'FP-Chrom', 'Recall-Chrom', 'Precision-Chrom', 'F1-Chrom'])
-elif calculate_metrics_for_components:
-    metric_names.extend(['TP-Mass', 'FP-IgnNeg-Mass', 'FP-Mass', 'TP-Peak', 'FP-IgnNeg-Peak', 'FP-Peak',
-                         'TP-Chrom', 'FP-IgnNeg-Chrom', 'FP-Chrom'])
+    mass_metric_names.extend(['Recall-Mass', 'Precision-Mass', 'F1-Mass'])
+    peak_metric_names.extend(['Recall-Peak', 'Precision-Peak', 'F1-Peak'])
+    chrom_metric_names.extend(['Recall-Chrom', 'Precision-Chrom', 'F1-Chrom'])
+if calculate_auc_metric:
+    metric_names.append('AUC')
+    mass_metric_names.append('AUC-Mass')
+    peak_metric_names.append('AUC-Peak')
+    chrom_metric_names.append('AUC-Chrom')
+if calculate_average_precision_metric:
+    metric_names.append('Average Precision')
+    mass_metric_names.append('AP-Mass')
+    peak_metric_names.append('AP-Peak')
+    chrom_metric_names.append('AP-Chrom')
+if calculate_metrics_for_components:
+    metric_names.extend(mass_metric_names + peak_metric_names + chrom_metric_names)
+metric_len = len(peak_metric_names)
 
+    
+### Initialise
+if batch_prediction_options['continue_from_saved'] and os.path.isfile(save_name):
+    df = pd.read_csv(save_name, index_col = 0)
+    metrics_list = list(df[metric_names].values)
+    prediction_times_list = list(df['Prediction Times'])
+    model_fullname_list = list(df['Model Name'])
+    repetition_list = list(df['Repetition'])
+    check_saved = True
+
+else:
+    metrics_list = []
+    prediction_times_list = []
+    model_fullname_list = []
+    repetition_list = []
+    check_saved = False
+    
 ### Predict
 # The variant loop is first, so the data only need to be loaded once for each variant (some variants do not use the peak data, hence the reloading between variants)
 for i in model_variants:
@@ -98,13 +129,20 @@ for i in model_variants:
     prediction_data, comparisons, info_df, peak_df_orig, peak_intensity = prepareDataForPrediction(data_path, ignore_peak_profile)
             
     for name in model_names:
+        model_fullname = name + '-' + '{:02d}'.format(i)  # Full name of the model - eg 'H-01'
+        
         for repeat in model_repeats:
+            # Check if this repetition has already been done
+            if check_saved:
+                if ((df['Model Name'] == model_fullname) & (df['Repetition'] == repeat)).any():
+                    continue
             
             # Combine the model name, variant and repetition to get the name of the model file to load
             model_file = "{}-{}-{:02d}-r{:02d}".format(batch_prediction_options['model_prefix'], name, i, repeat)
             print('---\nModel used: ', model_file)  
     
-            model_fullname_list.append(name + '-' + '{:02d}'.format(i))  # Full name of the model - eg 'H-01'
+            model_fullname_list.append(model_fullname)
+            repetition_list.append(repeat)
             
             if batch_prediction_options['save_individual_predictions']:
                 predictions_save_name = '{}/{}_{}_Prediction.csv'.format(results_path_individual, model_file, batch_prediction_options['dataset_name'][dataset_number])
@@ -120,21 +158,23 @@ for i in model_variants:
             
             # Get the metrics of the prediction results
             metrics = calculateMetrics(predictions, info_df, comparisons, calculate_f1 = calculate_f1_metric,
+                                       calculate_auc = calculate_auc_metric, calculate_average_precision = calculate_average_precision_metric,
                                        calculate_for_components = calculate_metrics_for_components, print_metrics = True)
             
             # Modify the returned metrics to include nan values for peak encoder (so the columns line up between different model variants)
             if calculate_metrics_for_components and ignore_peak_profile:  
-                if calculate_f1_metric:
-                    metrics[12:12] = [np.nan] * 6
-                else:
-                    metrics[6:6] = [np.nan] * 3
+                metrics[metric_len * 2 : metric_len * 2] = [np.nan] * metric_len
+
             metrics_list.append(metrics)
             sys.stdout.flush()
             
         df = pd.DataFrame(metrics_list, columns = metric_names)
         df['Prediction Times'] = prediction_times_list
         df['Model Name'] = model_fullname_list
+        df['Repetition'] = repetition_list
         df.to_csv(save_name)  # Saves the summary output after every prediction
-
-# Saves a mean output at the end (averaged over the model repetitions)
-df.groupby('Model Name').mean().to_csv(save_name[:-4] + '_Mean.csv')
+        
+        
+if len(sys.argv) == 2:  # No selection of model repeat
+    # Saves a mean output at the end (averaged over the model repetitions)
+    df.groupby('Model Name').mean().to_csv(save_name[:-4] + '_Mean.csv')

@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
-from utilsData import loadData, getRealGroupAssignments, getIncorrectExamples, calculateMetrics, printLastValues
+from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score
+from utilsData import loadData, getRealGroupAssignments, getIncorrectExamples, calculateMetrics, printLastValues, getGroundTruth
 from utilsPlotting import plotSpectrumTogether, plotPeaksTogether, plotPeaksByIndex
 from utilsAlignment import getDistanceMatrix, assignGroups, alignTimes, postprocessGroups
 from parameters import prediction_options, batch_prediction_options
@@ -34,6 +35,7 @@ def loadPredictions(prediction_file):
             comparisons = pd.read_csv(prediction_file, usecols = [0,1]).values
         except:
             raise e
+    print("File loaded:", prediction_file)
 
     return prediction, comparisons
 
@@ -75,7 +77,9 @@ def plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensit
         alignTimes(real_groups, info_df, peak_intensity, 'RealAlignedTime')
         if print_metrics:
             calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False,
-                             calculate_f1 = prediction_options['calculate_f1_metric'], print_metrics = True)
+                             calculate_f1 = prediction_options['calculate_f1_metric'],
+                             calculate_auc = prediction_options['calculate_auc_metric'],
+                             print_metrics = True)
 
     plotSpectrumTogether(info_df, peak_intensity, with_real = real_groups_available, save_name = None)
 #    plotPeaksTogether(info_df, peak_df_orig, with_real = real_groups_available, save_name = '../figures/alignment_plot')
@@ -304,12 +308,12 @@ def plotHistory(measure = 'loss', all_reps = False, model_file = None, ax = None
         g = df.groupby(df.index)
         history = g.mean()
         std = g.std()
-        formatted_labels = printLastValues(history, std, measure = measure)
+        formatted_labels = printLastValues(history, std, kind = measure)
         error_kw = {'elinewidth': 1, 'capthick': 1, 'capsize': 2, 'errorevery': len(history) // 50}  # Draw just 50 error bars across the plot
     else:
         history_file = '{}/{}-History.csv'.format(prediction_options['model_path'], model_file)
         history = pd.read_csv(history_file, index_col = 0)
-        formatted_labels = printLastValues(history, None, measure = measure)
+        formatted_labels = printLastValues(history, None, kind = measure)
         error_kw = {}  # No error bar options
     
     # Draw the plot
@@ -377,6 +381,46 @@ def plotSubnetworkHistory(measure = 'acc', all_reps = False):
     plt.ylabel('Accuracy' if measure.endswith('acc') else 'Loss')
 
 
+def plotROC(prediction, comparisons, info_df, ignore_negative_indices = True, show_threshold = False, cmap = 'Spectral'):
+    truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
+    if ignore_negative_indices:
+        fpr, tpr, thresholds = roc_curve(truth_ignore_neg, prediction[keep], pos_label = 1)
+    else:
+        fpr, tpr, thresholds = roc_curve(truth, prediction, pos_label = 1)
+    roc_auc = auc(fpr, tpr)
+    plt.plot(fpr, tpr, 'b', label = 'AUC = %0.3f' % roc_auc)
+    plt.legend()
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.title('Receiver Operating Characteristic')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    if show_threshold:
+        idx = np.arange(0, len(fpr) - 1, len(fpr) // 15)
+        plt.scatter(np.array(fpr)[idx], np.array(tpr)[idx], c = np.array(thresholds)[idx], vmin = 0, vmax = 1, s = 30, zorder = 5, cmap = cmap)
+        plt.colorbar(label = 'Threshold')
+
+def plotPrecisionRecallCurve(prediction, comparisons, info_df, ignore_negative_indices = True, show_threshold = False, cmap = 'Spectral'):
+    truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
+    if ignore_negative_indices:
+        precision, recall, thresholds = precision_recall_curve(truth_ignore_neg, prediction[keep])
+    else:
+        precision, recall, thresholds = precision_recall_curve(truth, prediction)
+    average_precision = average_precision_score(truth_ignore_neg, prediction[keep])
+    plt.plot(recall, precision, 'b', label = 'Average Precision = %0.3f' % average_precision)
+    plt.legend()
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.title('Precision-Recall Curve')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    if show_threshold:
+        idx = np.arange(0, len(precision) - 1, len(precision) // 15)
+        plt.scatter(np.array(recall)[idx], np.array(precision)[idx], c = np.array(thresholds)[idx], vmin = 0, vmax = 1, s = 30, zorder = 5, cmap = cmap)
+        plt.colorbar(label = 'Threshold')
+    
+
 
 if __name__ == "__main__":
     ## Load data
@@ -386,6 +430,12 @@ if __name__ == "__main__":
     
     ## Make plots
 #    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
+#    plt.figure()
+    calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False,
+                             calculate_f1 = prediction_options['calculate_f1_metric'],
+                             calculate_auc = prediction_options['calculate_auc_metric'],
+                             print_metrics = True)
+    plotROC(prediction, comparisons, info_df)
 #    plotPeaksByIndex(info_df, peak_df_orig, mass_profile_df, chromatogram_df, [2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
 #    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, sample_size = 5).ravel()
 #    incorrect = np.unique(incorrect)
@@ -394,7 +444,7 @@ if __name__ == "__main__":
 
 #    plotMetricsByModel(prediction_options['dataset_name'], metrics = ['True Positives', 'False Positives', 'F1'])
 #    plotPerformanceOnDatasetsByModel(datasets = [10,11], metric = 'False Positives', reference_model = 0)
-    plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True)
+#    plotProbabilityMatrix(prediction, comparisons, info_df, threshold = None, sort_by_group = True, highlight_negative_group = True)
 #    plotHistory('loss', False)
 #    plotSubnetworkHistory('val_acc', False)
 #    plotHistoryAcrossModels(model_names = ['H-02', 'H-32', 'I-32'], measure = 'val_main_prediction_acc', all_reps = True)

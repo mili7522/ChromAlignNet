@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import itertools
 import os
+from sklearn.metrics import roc_auc_score, average_precision_score
 
 ### Loading and preparing data
 def loadData(data_path, info_file = 'PeakData-WithGroup.csv', sequence_file = 'WholeSequence.csv', take_chromatogram_log = True):
@@ -225,7 +226,22 @@ def getRealGroupAssignments(info_df):
     
 
 ### Measuring performance
-def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, calculate_for_components = True, print_metrics = True):
+def getGroundTruth(comparisons, info_df, ignore_negative_indices = True):
+    x1 = comparisons[:,0]
+    x2 = comparisons[:,1]
+    g1 = info_df.loc[x1]['Group'].values
+    g2 = info_df.loc[x2]['Group'].values
+#    keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
+    keep = (g1 >= 0) | (g2 >= 0)  # Ignores only when both are in the negative group
+    truth = (g1 == g2)
+    truth_ignore_neg = (g1[keep] == g2[keep])
+    if ignore_negative_indices:
+        return truth, truth_ignore_neg, keep
+    else:
+        return truth
+    
+def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, calculate_auc = False,
+                     calculate_average_precision = False, calculate_for_components = True, print_metrics = True):
     """
     Calculates a list of metrics to track the performance of the predictions from the network
     
@@ -233,7 +249,9 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
         predictions -- Numpy array or list of numpy arrays: Column vector(s) of probabilities (from output(s) of ChromAlignNet)
         info_df -- DataFrame containing information about each peak, in particular the assigned group number
         comparisons -- Numpy array with two columns - x1 and x2 - containing the IDs of the two peaks being compared
-        calculate_f1 -- If True, calculates and returns the recall, precision and F1 metric
+        calculate_f1 -- If True, calculates the recall, precision and F1 metric as part of the returned metrics
+        calculate_auc -- If True, calculates the AUC as part of the returned metrics
+        calculate_average_precision -- If True, calculates the average precision as part of the returned metrics
         calculate_for_components -- If True, calculates the metrics for each sub-network as well as the main output
                                     Needs the 'predictions' argument to be a list of numpy arrays containing all outputs from the network
         print_metrics -- If True, the metrics are printed to the console as well as returned
@@ -243,13 +261,7 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
     """
     metrics = []
     
-    x1 = comparisons[:,0]
-    x2 = comparisons[:,1]
-    g1 = info_df.loc[x1]['Group'].values
-    g2 = info_df.loc[x2]['Group'].values
-    keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
-    truth = (g1 == g2)
-    truth_ignore_neg = (g1[keep] == g2[keep])
+    truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
     
     if calculate_for_components:
         names = ['chromatogram', 'mass', 'main']
@@ -266,8 +278,8 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
         p_ignore_neg = p[keep]
     
         TP = np.mean(p_ignore_neg[truth_ignore_neg])
-        FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])
-        FP = np.mean(p[~truth])
+        FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])  # No longer valid
+        FP = np.mean(p[~truth])  # This is used in the paper
         metrics.extend([TP, FP_ignore_neg, FP])
         
         if print_metrics:
@@ -288,7 +300,20 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
                 print('Recall: {:.3f}'.format(recall))
                 print('Precision: {} / {} = {:.3f}'.format(np.sum(p_ignore_neg[truth_ignore_neg]), np.sum(p_ignore_neg), precision))
                 print('F1: {:.3f}'.format(f1))
-
+                
+        if calculate_auc:
+            roc_auc = roc_auc_score(truth_ignore_neg, prediction[keep])
+            metrics.append(roc_auc)
+#            metrics.append(roc_auc_score(truth, prediction))
+            if print_metrics:
+                print('AUC: {:.3f}'.format(roc_auc))
+#                print('AUC not ignoring neg: {:.3f}'.format(roc_auc_score(truth, prediction)))
+        if calculate_average_precision:
+            average_precision = average_precision_score(truth_ignore_neg, prediction[keep])
+            metrics.append(average_precision)
+            if print_metrics:
+                print('Average Precision: {:.3f}'.format(average_precision))
+                
     return metrics
 
 
@@ -308,20 +333,18 @@ def getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, sa
                            the peak ID of x1 and the second column refers to x2.
                            Each row gives the pair of peaks involved in an incorrect prediction
     """
-    x1 = comparisons[:,0]
-    x2 = comparisons[:,1]
-    g1 = info_df.loc[x1]['Group'].values
-    g2 = info_df.loc[x2]['Group'].values
-    truth = (g1 == g2)
+    
+    truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
+    
     p = np.round(prediction).astype(int).ravel()
     if ignore_neg:
-        keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
-        truth = (g1[keep] == g2[keep])
+        truth = truth_ignore_neg
         p = p[keep]
         comparisons = comparisons[keep]
     incorrect = p != truth
     incorrect_array = comparisons[incorrect][:sample_size]
     return incorrect_array
+
 
 
 def printLastValues(history, std = None, kind = 'loss'):

@@ -54,15 +54,18 @@ training_options = {
 prediction_options = {
     'ignore_negatives': False,  # If True, groups assigned with a negative index will be ignored in prediction
     'time_cutoff': 3,  # Maximum difference in retention time (in minutes) between two peaks which will be considered for alignment
-    'results_path': 'results/',  # Path to save results
+#    'results_path': 'Z:/ChromAlignmentNN/results/20181208-predictModelH_individuals/',  # Path to save results
+    'results_path': 'results',
 
-    'model_path': 'SavedModels/',  # Path where trained models are saved
-    'model_file': 'ChromAlignNet-H-01-r01',  # Name of specific model to load and use for prediction
-    'dataset_number': 7,  # Data set to align (indexed according to data_options['datasets'])
+    'model_path': 'SavedModels/20181120-trainModelH_savedModels',  # Path where trained models are saved
+    'model_file': 'ChromAlignNet-H-23-r06',  # Name of specific model to load and use for prediction
+    'dataset_number': 9,  # Data set to align (indexed according to data_options['datasets'])
     'info_file': 'PeakData-WithGroup.csv',  # Name of csv file containing summary information about each peak. Loaded as infoDf
     'sequence_file': 'WholeSequence.csv',  # Name of csv file containing the data used to extract the chromatogram segments
     'plot_alignment': True,  # If True, the alignment outcome will be plotted after prediction in PredictChromAlignNet.py
     'calculate_f1_metric': True,
+    'calculate_auc_metric': True,
+    'calculate_average_precision_metric': True,
     'calculate_metrics_for_components': True,  # If True, the metrics for the output from each sub-network will be calculated as well as the main output
     'ignore_same_sample': False  # If True, peaks from within the same sample will not be considered for alignment (and so assumed to have a probability of 0)
 }
@@ -80,10 +83,11 @@ batch_prediction_options = {
     'save_names': ["ModelTests-On{}.csv".format(x) for x in data_options['dataset_name']],  # Gives the name of the csv file to be saved with the metrics from each prediction. The particular name will be selected by indexing with the ID of the data set
     'model_repeats': range(1,11),  # The full range of repetitions of the model which were trained
     'model_names': ['H'],  # The letter name of the model that was trained (indicating the data sets that were used in the training)
-    'model_variants': [2],  # The variant of the model that was trained (defined in modelDefinition.py)
+    'model_variants': [1, 2, 20, 21, 23, 24],  # The variant of the model that was trained (defined in modelDefinition.py)
     'verbose_prediction' : 0,  # 0 = silent, 1 = progress bar
     'save_individual_predictions': True,  # If True, the prediction outcomes (probabilities) are saved as well as the metrics
-    'individual_predictions_save_path': 'Individual'  # Name of subfolder to store individual prediction output, or 'None' to save in the main 'results_path'
+    'individual_predictions_save_path': 'Individual',  # Name of subfolder to store individual prediction output, or 'None' to save in the main 'results_path'
+    'continue_from_saved': True
 }
 
 
