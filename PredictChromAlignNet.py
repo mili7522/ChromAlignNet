@@ -37,6 +37,21 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
     info_df, peak_df, mass_profile_df, chromatogram_df, peak_df_orig, peak_intensity = loadData(data_path,
                                                                                                 prediction_options['info_file'],
                                                                                                 prediction_options['sequence_file'])
+    ### Added
+    idx = info_df['Group'] != -2
+    info_df = info_df[idx]
+    info_df.reset_index(inplace = True, drop = True)
+    peak_df = peak_df[idx]
+    peak_df.reset_index(inplace = True, drop = True)
+    mass_profile_df = mass_profile_df[idx]
+    mass_profile_df.reset_index(inplace = True, drop = True)
+    peak_df_orig = peak_df_orig[idx]
+    peak_df_orig.reset_index(inplace = True, drop = True)
+    peak_intensity = peak_intensity[idx]
+    peak_intensity.reset_index(inplace = True, drop = True)
+    ###
+
+
     real_groups_available = 'Group' in info_df  # Check if ground truth groups have been assigned. Returns True or False
 
     # Remove null rows and negative indexed groups
@@ -50,6 +65,7 @@ def prepareDataForPrediction(data_path, ignore_peak_profile):
 
     print("Dropped rows: {}".format(np.sum(keep_index == False)))
 
+    
     chrom_seg_df = getChromatographSegmentDf(info_df, chromatogram_df, segment_length = 600)
 
     # Generate data combinations
@@ -157,6 +173,7 @@ if __name__ == "__main__":
     if 'Group' in info_df:
         calculateMetrics(predictions, info_df, comparisons, calculate_for_components = prediction_options['calculate_metrics_for_components'],
                          calculate_f1 = prediction_options['calculate_f1_metric'], calculate_auc = prediction_options['calculate_auc_metric'],
+                         calculate_average_precision = prediction_options['calculate_average_precision_metric'],
                          print_metrics = True)
     
     if prediction_options['plot_alignment']:

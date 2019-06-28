@@ -160,8 +160,20 @@ def generateCombinationIndices(info_df, time_cutoff = None, return_y = True, ran
         different_sample = x1_file != x2_file
         comparisons = comparisons[different_sample]
 
+
+#    ### Added
+#    x1 = x1[info_df.loc[x1,'Group'] != -2]
+#    x2 = x2[info_df.loc[x2,'Group'] != -2]
+#    
+#    x1_group = info_df.loc[comparisons[:,0]]['Group'].values
+#    x2_group = info_df.loc[comparisons[:,1]]['Group'].values
+#    not_neg_2 = (x1_group != -2) & (x2_group != -2)
+#    comparisons = comparisons[not_neg_2]
+#    ###
+
     x1 = comparisons[:,0]
     x2 = comparisons[:,1]
+    
 
     if return_y:
         # Redraw training examples to ensure that the number of negative examples matches the number of positive examples for each group
@@ -231,7 +243,7 @@ def getGroundTruth(comparisons, info_df, ignore_negative_indices = True):
     x2 = comparisons[:,1]
     g1 = info_df.loc[x1]['Group'].values
     g2 = info_df.loc[x2]['Group'].values
-#    keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
+    # keep = (g1 >= 0) & (g2 >= 0)  # Ignore negative indices
     keep = (g1 >= 0) | (g2 >= 0)  # Ignores only when both are in the negative group
     truth = (g1 == g2)
     truth_ignore_neg = (g1[keep] == g2[keep])
@@ -278,7 +290,7 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
         p_ignore_neg = p[keep]
     
         TP = np.mean(p_ignore_neg[truth_ignore_neg])
-        FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])  # No longer valid
+        FP_ignore_neg = np.mean(p_ignore_neg[~truth_ignore_neg])  # The previous calculated values are no longer valid due to the change in the keep boolean
         FP = np.mean(p[~truth])  # This is used in the paper
         metrics.extend([TP, FP_ignore_neg, FP])
         
@@ -304,10 +316,9 @@ def calculateMetrics(predictions, info_df, comparisons, calculate_f1 = True, cal
         if calculate_auc:
             roc_auc = roc_auc_score(truth_ignore_neg, prediction[keep])
             metrics.append(roc_auc)
-#            metrics.append(roc_auc_score(truth, prediction))
             if print_metrics:
                 print('AUC: {:.3f}'.format(roc_auc))
-#                print('AUC not ignoring neg: {:.3f}'.format(roc_auc_score(truth, prediction)))
+                
         if calculate_average_precision:
             average_precision = average_precision_score(truth_ignore_neg, prediction[keep])
             metrics.append(average_precision)

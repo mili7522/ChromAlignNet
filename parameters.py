@@ -13,7 +13,16 @@ data_options = {
                   'data/test-Air134/',            #8
                   'data/test-Field73/',           #9
                   'data/test-Field88/',           #10
-                  'data/test-Field134/'           #11
+                  'data/test-Field134/',          #11
+                  'data/test-Healthy_mz43_rt860/',   #12
+                  'data/test-PfAir_mz120_rt1460/',   #13
+                  'data/test-PfAir_mz134_rt1470/',   #14
+                  'data/test-Healthy_mz43_rt2390/',  #15
+                  'data/test-Healthy_mz57_rt1810/',  #16
+                  'data/test-Healthy_mz77_rt1180/',  #17
+                  'data/test-Healthy_mz79_rt1430/',  #18
+                  'data/test-Healthy_mz91_rt1490/',  #19
+                  'data/test-Healthy_mz91_rt1530/',  #20
                 ]
 }
 data_options['dataset_name'] = [ x.split('-')[-1].strip('/') for x in data_options['datasets'] ]
@@ -54,12 +63,12 @@ training_options = {
 prediction_options = {
     'ignore_negatives': False,  # If True, groups assigned with a negative index will be ignored in prediction
     'time_cutoff': 3,  # Maximum difference in retention time (in minutes) between two peaks which will be considered for alignment
-#    'results_path': 'Z:/ChromAlignmentNN/results/20181208-predictModelH_individuals/',  # Path to save results
-    'results_path': 'results',
+    'results_path': 'Z:/ChromAlignmentNN/results/20181208-predictModelH_individuals/',  # Path to save results
+#    'results_path': 'results',
 
     'model_path': 'SavedModels/20181120-trainModelH_savedModels',  # Path where trained models are saved
-    'model_file': 'ChromAlignNet-H-23-r06',  # Name of specific model to load and use for prediction
-    'dataset_number': 9,  # Data set to align (indexed according to data_options['datasets'])
+    'model_file': 'ChromAlignNet-H-21-r03',  # Name of specific model to load and use for prediction
+    'dataset_number': 7,  # Data set to align (indexed according to data_options['datasets'])
     'info_file': 'PeakData-WithGroup.csv',  # Name of csv file containing summary information about each peak. Loaded as infoDf
     'sequence_file': 'WholeSequence.csv',  # Name of csv file containing the data used to extract the chromatogram segments
     'plot_alignment': True,  # If True, the alignment outcome will be plotted after prediction in PredictChromAlignNet.py

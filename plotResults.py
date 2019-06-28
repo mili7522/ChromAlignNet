@@ -360,7 +360,7 @@ def plotHistoryAcrossModels(model_names, measure = 'loss', all_reps = True):
     plt.legend(model_short_name)  # Replace the legend with a new one
 
 
-def plotSubnetworkHistory(measure = 'acc', all_reps = False):
+def plotSubnetworkHistory(measure = 'acc', all_reps = False, ignore_peak_profile = False):
     """
     Plots the history of each sub-network by calling the plotHistory function.
     One of four plots can be drawn, specified by setting the 'measure' parameter.
@@ -370,30 +370,60 @@ def plotSubnetworkHistory(measure = 'acc', all_reps = False):
     Arguments:
         measure -- The component of the history to plot, defined as a string ('acc', 'loss', 'val_acc' or 'val_loss')
         all_reps -- If True, plots the mean and standard deviation across all repetitions of the model
+        ignore_peak_profile -- True if the peak encoder was not used as part of the model, else False
     """
     if measure.endswith('acc'):
         ms = ['main_prediction_acc', 'mass_prediction_acc', 'peak_prediction_acc', 'chromatogram_prediction_acc']
     if measure.endswith('loss'):
         ms = ['main_prediction_loss', 'mass_prediction_loss', 'peak_prediction_loss', 'chromatogram_prediction_loss']
+    if ignore_peak_profile:
+        del ms[2]
     if measure.startswith('val'):
         ms = ['val_' + i for i in ms]
     plotHistory(ms, all_reps)
     plt.ylabel('Accuracy' if measure.endswith('acc') else 'Loss')
 
 
-def plotROC(prediction, comparisons, info_df, ignore_negative_indices = True, show_threshold = False, cmap = 'Spectral'):
-    truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
-    if ignore_negative_indices:
-        fpr, tpr, thresholds = roc_curve(truth_ignore_neg, prediction[keep], pos_label = 1)
+def plotPredictionConfidenceHistogram(predictions, info_df, ignore_peak_profile, bins = 20, split_true_false = False, **kwargs):
+    fig, axes = plt.subplots(nrows = 2 if split_true_false else 1, ncols = 3 if ignore_peak_profile else 4, sharex=True, sharey='row')
+    if ignore_peak_profile:
+        plots = zip(['Main', 'Mass', 'Chromatogram'], ['probability', 'prob_mass', 'prob_chrom'])
     else:
-        fpr, tpr, thresholds = roc_curve(truth, prediction, pos_label = 1)
+        plots = zip(['Main', 'Mass', 'Peak', 'Chromatogram'], ['probability', 'prob_mass', 'prob_peak', 'prob_chrom'])
+        
+    if split_true_false:
+        comparisons = predictions[['x1', 'x2']].values
+        truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
+        axes[0][0].set_ylabel('True Cases')
+        axes[1][0].set_ylabel('False Cases')
+        
+    for i, (title, column) in enumerate(plots):
+        if split_true_false:
+            axes[0][i].hist(predictions[keep][truth_ignore_neg][column], bins = np.linspace(0,1,bins), **kwargs)
+            axes[1][i].hist(predictions[keep][~truth_ignore_neg][column], bins = np.linspace(0,1,bins), **kwargs)
+            axes[0][i].set_title(title)
+            axes[1][i].set_xlabel('Probability')
+        else:
+            axes[i].hist(predictions[column], bins = np.linspace(0,1,bins), **kwargs)
+            axes[i].set_title(title)
+            axes[i].set_xlabel('Probability')
+
+
+def plotROC(prediction, comparisons, info_df, show_threshold = False, cmap = 'Spectral', show_title = True, plot_multi = False, colour = None, show_label = True):
+    truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
+    fpr, tpr, thresholds = roc_curve(truth_ignore_neg, prediction[keep], pos_label = 1)
     roc_auc = auc(fpr, tpr)
-    plt.plot(fpr, tpr, 'b', label = 'AUC = %0.3f' % roc_auc)
-    plt.legend()
-    plt.plot([0, 1], [0, 1], 'r--')
-    plt.xlim([0, 1])
-    plt.ylim([0, 1])
-    plt.title('Receiver Operating Characteristic')
+    if plot_multi:
+        plt.plot(fpr, tpr, c = colour if colour is not None else 'b', label = 'AUC = %0.3f' % roc_auc if show_label else None, alpha = 1 if colour is not None else 0.5)
+    else:
+        plt.plot(fpr, tpr, 'b', label = 'AUC = %0.3f' % roc_auc if show_label else None)
+        plt.legend()
+    if plt.xlim() != (0, 1):
+        plt.plot([0, 1], [0, 1], 'r--')
+        plt.xlim([0, 1])
+        plt.ylim([0, 1])
+    if show_title:
+        plt.title('Receiver Operating Characteristic')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     if show_threshold:
@@ -401,18 +431,20 @@ def plotROC(prediction, comparisons, info_df, ignore_negative_indices = True, sh
         plt.scatter(np.array(fpr)[idx], np.array(tpr)[idx], c = np.array(thresholds)[idx], vmin = 0, vmax = 1, s = 30, zorder = 5, cmap = cmap)
         plt.colorbar(label = 'Threshold')
 
-def plotPrecisionRecallCurve(prediction, comparisons, info_df, ignore_negative_indices = True, show_threshold = False, cmap = 'Spectral'):
+
+def plotPrecisionRecallCurve(prediction, comparisons, info_df, show_threshold = False, cmap = 'Spectral', show_title = True, plot_multi = False, colour = None, show_label = True):
     truth, truth_ignore_neg, keep = getGroundTruth(comparisons, info_df, ignore_negative_indices = True)
-    if ignore_negative_indices:
-        precision, recall, thresholds = precision_recall_curve(truth_ignore_neg, prediction[keep])
-    else:
-        precision, recall, thresholds = precision_recall_curve(truth, prediction)
+    precision, recall, thresholds = precision_recall_curve(truth_ignore_neg, prediction[keep])
     average_precision = average_precision_score(truth_ignore_neg, prediction[keep])
-    plt.plot(recall, precision, 'b', label = 'Average Precision = %0.3f' % average_precision)
-    plt.legend()
+    if plot_multi:
+        plt.plot(recall, precision, c = colour if colour is not None else 'b', label = 'Average Precision = %0.3f' % average_precision if show_label else None, alpha = 1 if colour is not None else 0.5)
+    else:
+        plt.plot(recall, precision, 'b', label = 'Average Precision = %0.3f' % average_precision if show_label else None)
+        plt.legend()
     plt.xlim([0, 1])
     plt.ylim([0, 1])
-    plt.title('Precision-Recall Curve')
+    if show_title:
+        plt.title('Precision-Recall Curve')
     plt.xlabel('Recall')
     plt.ylabel('Precision')
     if show_threshold:
@@ -429,13 +461,13 @@ if __name__ == "__main__":
     prediction, comparisons = loadPredictions(prediction_options['predictions_save_name'])
     
     ## Make plots
-#    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
+    plotAlignments(prediction, comparisons, info_df, peak_df_orig, peak_intensity)
 #    plt.figure()
-    calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False,
-                             calculate_f1 = prediction_options['calculate_f1_metric'],
-                             calculate_auc = prediction_options['calculate_auc_metric'],
-                             print_metrics = True)
-    plotROC(prediction, comparisons, info_df)
+#    calculateMetrics(prediction, info_df, comparisons, calculate_for_components = False,
+#                             calculate_f1 = prediction_options['calculate_f1_metric'],
+#                             calculate_auc = prediction_options['calculate_auc_metric'],
+#                             print_metrics = True)
+#    plotROC(prediction, comparisons, info_df)
 #    plotPeaksByIndex(info_df, peak_df_orig, mass_profile_df, chromatogram_df, [2], margin = 100, plot_log_sequence = True, read_clipboard = False, plot_as_subplots = False)
 #    incorrect = getIncorrectExamples(prediction, info_df, comparisons, ignore_neg = True, sample_size = 5).ravel()
 #    incorrect = np.unique(incorrect)

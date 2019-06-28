@@ -61,10 +61,6 @@ if batch_prediction_options['save_individual_predictions']:
     os.makedirs(results_path_individual, exist_ok = True)
 
 
-### Initialise
-metrics_list = []
-prediction_times_list = []
-model_fullname_list = []
 
 # Check input, make sure we're using the correct data file name and where 
 # the results will be saved to. 
@@ -172,9 +168,9 @@ for i in model_variants:
         df['Prediction Times'] = prediction_times_list
         df['Model Name'] = model_fullname_list
         df['Repetition'] = repetition_list
-        df.to_csv(save_name)  # Saves the summary output after every prediction
+        df.dropna(axis='columns', how = 'all', inplace = False).to_csv(save_name)  # Saves the summary output after every prediction
         
         
 if len(sys.argv) == 2:  # No selection of model repeat
     # Saves a mean output at the end (averaged over the model repetitions)
-    df.groupby('Model Name').mean().to_csv(save_name[:-4] + '_Mean.csv')
+    df.groupby('Model Name').mean().dropna(axis='columns', how = 'all', inplace = False).to_csv(save_name[:-4] + '_Mean.csv')
