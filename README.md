@@ -1,6 +1,6 @@
 # ChromAlignNet
 
-Implementation of "Peak Alignment of GC-MS Data with Deep Learning" - https://arxiv.org/abs/1904.01205.
+Implementation of "Peak alignment of gas chromatography–mass spectrometry data with deep learning" - https://www.sciencedirect.com/science/article/pii/S0021967319308623.
 
 ## Outline:
 This model uses a deep neural network for the alignment of Gas Chromatography - Mass Spectroscopy (GC-MS) peaks.
