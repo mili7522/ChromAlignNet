@@ -17,7 +17,6 @@ batch_size = training_options['batch_size']  # Number of training examples per m
 validation_split = training_options['validation_split']  # Ratio of the data set to be used for validation
 verbose_training = training_options['verbose_training']  # 0 = silent, 1 = progress bar, 2 = one line per epoch 
 adam_optimizer_options = training_options['adam_optimizer_options']  # Optimiser options
-train_with_gpu = training_options['train_with_gpu']
 random_seed_type = training_options['random_seed_type']  # How the random seed is generated. 1 = from model name, 2 = clock time, 3 = load from file
 
 save_checkpoints = training_options['save_checkpoints']  # If True, checkpoints are saved. If checkpoints exist, training will resume from the last checkpoint
@@ -87,7 +86,7 @@ with open(os.path.join(model_path, model_name) + '-RandomSeed.txt', 'a') as f:
     f.write('%d\n' % random_seed)
 
 # Configure the GPU if it is used for training
-if train_with_gpu:
+if tf.__version__.startswith('1') and tf.test.is_gpu_available():
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     session = tf.Session(config=config)

@@ -25,7 +25,6 @@ training_options = {
     'validation_split': 0.2,  # Ratio of the data set to be used for validation
     'verbose_training': 2,  # 0 = silent, 1 = progress bar, 2 = one line per epoch 
     'adam_optimizer_options': {'lr': 0.001, 'beta_1': 0.9, 'beta_2': 0.999},  # Optimiser options. lr = learning rate
-    'train_with_gpu': True,  # If True, the GPU is used for training
     'random_seed_type': 1,  # How the random seed is generated. Type 1 for repeatability (generates from model name), type 2 for random number using clock time, type 3 to load the last used number
     
     'save_checkpoints': True,  # If True, the model will be (uniquely) saved after every epoch. If checkpoints exist, training will resume from the last checkpoint
@@ -54,12 +53,11 @@ training_options = {
 prediction_options = {
     'ignore_negatives': False,  # If True, groups assigned with a negative index will be ignored in prediction
     'time_cutoff': 3,  # Maximum difference in retention time (in minutes) between two peaks which will be considered for alignment
-#    'results_path': 'Z:/ChromAlignmentNN/results/20181208-predictModelH_individuals/',  # Path to save results
-    'results_path': 'results',
+    'results_path': 'results',  # Path to save results
 
-    'model_path': 'SavedModels/20181120-trainModelH_savedModels',  # Path where trained models are saved
-    'model_file': 'ChromAlignNet-H-23-r06',  # Name of specific model to load and use for prediction
-    'dataset_number': 9,  # Data set to align (indexed according to data_options['datasets'])
+    'model_path': 'SavedModels',  # Path where trained models are saved
+    'model_file': 'ChromAlignNet-A-02-r08',  # Name of specific model to load and use for prediction
+    'dataset_number': 1,  # Data set to align (indexed according to data_options['datasets'])
     'info_file': 'PeakData-WithGroup.csv',  # Name of csv file containing summary information about each peak. Loaded as infoDf
     'sequence_file': 'WholeSequence.csv',  # Name of csv file containing the data used to extract the chromatogram segments
     'plot_alignment': True,  # If True, the alignment outcome will be plotted after prediction in PredictChromAlignNet.py
